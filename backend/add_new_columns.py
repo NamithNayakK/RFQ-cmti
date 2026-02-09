@@ -1,7 +1,4 @@
 #!/usr/bin/env python3
-"""
-Migration script to add new columns to the files table
-"""
 import psycopg2
 from psycopg2 import sql
 import os
@@ -15,7 +12,6 @@ DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = os.getenv("DB_PORT", "5432")
 DB_NAME = os.getenv("DB_NAME", "filedb")
 
-# Connect to database
 try:
     conn = psycopg2.connect(
         dbname=DB_NAME,
@@ -26,8 +22,8 @@ try:
     )
     cur = conn.cursor()
     
-    # Check if columns exist and add them if they don't
     columns_to_add = [
+        ("version", "INTEGER DEFAULT 1 NOT NULL"),
         ("material", "VARCHAR"),
         ("part_number", "VARCHAR"),
         ("quantity_unit", "VARCHAR DEFAULT 'pieces'")

@@ -13,7 +13,6 @@ async def create_quote(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    """Create a new quote from a manufacturer"""
     try:
         quote = QuoteService.create_quote(db, quote_data, current_user['username'])
         return quote
@@ -23,13 +22,11 @@ async def create_quote(
             detail=f"Failed to create quote: {str(e)}"
         )
 
-# Specific GET routes should come before generic /{quote_id} route
 @router.get("/manufacturer/stats", response_model=dict)
 async def get_manufacturer_stats(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    """Get quote statistics for the current manufacturer"""
     stats = QuoteService.get_quote_stats(db, current_user['username'])
     return stats
 
@@ -39,7 +36,6 @@ async def get_quotes_by_status(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    """Get quotes filtered by status"""
     valid_statuses = ['pending', 'sent', 'accepted', 'rejected']
     if status_filter not in valid_statuses:
         raise HTTPException(
@@ -56,11 +52,9 @@ async def get_quotes_by_notification(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    """Get all quotes for a specific notification/file upload"""
     quotes = QuoteService.get_quotes_by_notification(db, notification_id)
     return quotes
 
-# Generic routes (list and single item)
 @router.get("", response_model=QuoteListResponse)
 async def get_quotes(
     status: str = Query(None, alias="status"),
@@ -69,13 +63,10 @@ async def get_quotes(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    """Get all quotes for the current user (manufacturer)"""
-    # Get quotes and filter by status if provided
     from sqlalchemy import and_
     
     query = db.query(Quote).filter(Quote.created_by == current_user['username'])
     
-    # Apply status filter if provided
     if status:
         valid_statuses = ['pending', 'sent', 'accepted', 'rejected']
         if status not in valid_statuses:
@@ -88,7 +79,6 @@ async def get_quotes(
     total_count = query.count()
     quotes = query.order_by(Quote.created_at.desc()).limit(limit).offset(offset).all()
     
-    # Count all statuses for the manufacturer
     all_quotes_query = db.query(Quote).filter(Quote.created_by == current_user['username'])
     
     return {
@@ -106,7 +96,6 @@ async def get_quote(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    """Get a specific quote"""
     quote = QuoteService.get_quote(db, quote_id)
     if not quote:
         raise HTTPException(
@@ -122,7 +111,6 @@ async def update_quote_status(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    """Accept or reject a quote (buyer)"""
     quote = QuoteService.get_quote(db, quote_id)
     if not quote:
         raise HTTPException(
@@ -153,7 +141,6 @@ async def delete_quote(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    """Delete a quote (only by creator)"""
     try:
         quote = QuoteService.get_quote(db, quote_id)
         if not quote:
@@ -181,7 +168,6 @@ async def delete_quote(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error deleting quote: {str(e)}"
         )
-# ===================== BUYER QUOTE NOTIFICATIONS =====================
 
 @router.get("/buyer/notifications", response_model=dict)
 async def get_buyer_quote_notifications(
@@ -190,7 +176,6 @@ async def get_buyer_quote_notifications(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    """Get all quote notifications for the current buyer"""
     from app.models.quote_notification_models import QuoteNotification, QuoteNotificationListResponse
     
     notifications, total_count = QuoteService.get_buyer_quote_notifications(
@@ -210,7 +195,6 @@ async def mark_quote_notification_read(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    """Mark a quote notification as read"""
     success = QuoteService.mark_quote_notification_as_read(db, notification_id)
     if not success:
         raise HTTPException(
@@ -224,7 +208,6 @@ async def get_unread_count(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    """Get count of unread quote notifications for the buyer"""
     unread_count = QuoteService.get_unread_quote_notifications_count(db, current_user['username'])
     return {"unread_count": unread_count}
 
@@ -234,7 +217,6 @@ async def delete_quote_notification(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    """Delete a specific quote notification for the buyer"""
     from app.models.quote_notification_models import QuoteNotification
     
     notification = db.query(QuoteNotification).filter(
@@ -256,7 +238,6 @@ async def clear_all_quote_notifications(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    """Delete all quote notifications for the buyer"""
     from app.models.quote_notification_models import QuoteNotification
     
     db.query(QuoteNotification).filter(

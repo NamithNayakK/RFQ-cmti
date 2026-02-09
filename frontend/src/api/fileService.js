@@ -31,6 +31,9 @@ export const fileService = {
 
   // Upload file to presigned URL
   uploadFile: async (uploadUrl, file, onProgress) => {
+    if (!file) {
+      throw new Error('File object is required');
+    }
     const response = await axios.put(uploadUrl, file, {
       headers: {
         'Content-Type': file.type || 'application/octet-stream',

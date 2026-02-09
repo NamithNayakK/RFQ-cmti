@@ -191,6 +191,11 @@ export default function FileUpload({ onUploadSuccess }) {
       // Step 1: Request upload URL
       const fileInput = document.querySelector('input[type="file"]');
       const file = fileInput?.files[0];
+      
+      if (!file) {
+        throw new Error('No file selected. Please select a file to upload.');
+      }
+      
       const lowerName = formData.filename.toLowerCase();
       const contentType = lowerName.endsWith('.igs') || lowerName.endsWith('.iges')
         ? 'application/iges'
@@ -209,9 +214,18 @@ export default function FileUpload({ onUploadSuccess }) {
       };
 
       const urlResponse = await fileService.requestUploadUrl(uploadData);
+      
+      if (!urlResponse || !urlResponse.upload_url) {
+        throw new Error('Failed to get upload URL from server');
+      }
+      
       const { upload_url, file_id } = urlResponse;
 
       // Step 2: Upload file to presigned URL
+      if (!upload_url) {
+        throw new Error('Invalid upload URL received from server');
+      }
+      
       await fileService.uploadFile(upload_url, file, setProgress);
 
       setSuccess(`File "${formData.filename}" uploaded successfully! File ID: ${file_id}`);

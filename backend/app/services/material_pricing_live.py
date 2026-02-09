@@ -7,14 +7,12 @@ from app.config.settings import (
     DEFAULT_MACHINE_COST_INR,
 )
 
-# Direct Indian Market Prices in INR per Kg (typical range)
-# Based on MCX/NCDEX and Indian metal market rates
 BASE_INR_PRICES_PER_KG: Dict[str, float] = {
-    "Steel": 55.00,           # ₹55/kg - Mild Steel
-    "Aluminum": 225.00,       # ₹225/kg -  Aluminum
-    "Stainless Steel": 100.00, # ₹100/kg - SS 304
-    "Cast Iron": 45.00,       # ₹45/kg - Cast Iron
-    "Brass": 400.00,          # ₹400/kg - Brass Rod
+    "Steel": 55.00,
+    "Aluminum": 225.00,
+    "Stainless Steel": 100.00,
+    "Cast Iron": 45.00,
+    "Brass": 400.00,
 }
 
 DEFAULT_MIN_ORDER: Dict[str, int] = {
@@ -32,14 +30,10 @@ _cache: Dict[str, Optional[object]] = {
 
 
 def get_live_material_costs(materials: Optional[List[str]] = None) -> Dict[str, object]:
-    """Get live material costs in INR from Indian market rates.
-    Prices are cached for 24 hours (configurable via MATERIAL_PRICE_CACHE_MINUTES).
-    """
     now = datetime.now(timezone.utc)
     expires_at = _cache.get("expires_at")
     payload = _cache.get("payload")
 
-    # Return cached data if still valid
     if payload and isinstance(expires_at, datetime) and now < expires_at:
         if materials:
             filtered_items = [item for item in payload["items"] if item["material"] in materials]
@@ -53,7 +47,7 @@ def get_live_material_costs(materials: Optional[List[str]] = None) -> Dict[str, 
         items.append({
             "id": index,
             "material": material,
-            "costPerKg": round(inr_price, 2),  # Direct INR price
+            "costPerKg": round(inr_price, 2),
             "laborCostPerHour": round(DEFAULT_LABOR_COST_INR, 2),
             "machineCostPerHour": round(DEFAULT_MACHINE_COST_INR, 2),
             "minimumOrder": DEFAULT_MIN_ORDER.get(material, 10),

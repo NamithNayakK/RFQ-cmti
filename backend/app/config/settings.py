@@ -1,21 +1,20 @@
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+env_path = Path(__file__).parent.parent.parent / '.env'
+load_dotenv(dotenv_path=env_path)
 
-# MinIO Configuration
 MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT")
 MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY")
 MINIO_BUCKET = os.getenv("MINIO_BUCKET")
 MINIO_SECURE = os.getenv("MINIO_SECURE") == "true"
 
-# Database Configuration
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-# Manufacturing STP File Configuration
-MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", "500"))  # 500 MB default for STP files
-ALLOWED_EXTENSIONS = [".stp", ".step", ".igs", ".iges", ".STP", ".STEP", ".IGS", ".IGES"]  # STEP/IGES extensions
+MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", "500"))
+ALLOWED_EXTENSIONS = [".stp", ".step", ".igs", ".iges", ".STP", ".STEP", ".IGS", ".IGES"]
 ALLOWED_CONTENT_TYPES = [
     "application/stp",
     "application/step",
@@ -28,12 +27,10 @@ ALLOWED_CONTENT_TYPES = [
     "model/iges"
 ]
 
-# API Configuration
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",")  # Comma-separated list
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",")
 API_TITLE = "Manufacturing STP File Storage API"
 API_VERSION = "2.0.0"
 
-# Authentication Configuration
 AUTH_USERNAME = os.getenv("AUTH_USERNAME")
 AUTH_PASSWORD = os.getenv("AUTH_PASSWORD")
 AUTH_PASSWORD_HASH = os.getenv("AUTH_PASSWORD_HASH")

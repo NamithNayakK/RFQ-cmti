@@ -1,0 +1,29 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run backend (FastAPI)",
+			"type": "shell",
+			"command": "cd backend; python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000",
+			"isBackground": true
+		},
+		{
+			"label": "Run frontend (Vite)",
+			"type": "shell",
+			"command": "cd frontend; npm run dev",
+			"isBackground": true
+		},
+		{
+			"label": "Run backend (FastAPI)",
+			"type": "shell",
+			"command": "cd /d d:\\ADA\\backend && python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000",
+			"isBackground": true
+		},
+		{
+			"label": "Run frontend (Vite)",
+			"type": "shell",
+			"command": "cd /d d:\\ADA\\frontend && npm run dev",
+			"isBackground": true
+		}
+	]
+}

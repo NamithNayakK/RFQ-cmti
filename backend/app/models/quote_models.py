@@ -6,7 +6,6 @@ from typing import Optional
 from app.models.file_models import Base
 
 class Quote(Base):
-    """Quote model for manufacturer quotations sent to buyers"""
     __tablename__ = 'quotes'
 
     id = Column(Integer, primary_key=True)
@@ -17,7 +16,6 @@ class Quote(Base):
     material = Column(String(100))
     quantity_unit = Column(String(50))
     
-    # Costing
     material_cost = Column(Float, nullable=False)
     labor_cost = Column(Float, nullable=False)
     machine_time_cost = Column(Float, nullable=False)
@@ -26,7 +24,6 @@ class Quote(Base):
     profit_amount = Column(Float, nullable=False)
     total_price = Column(Float, nullable=False)
     
-    # Status and metadata
     status = Column(String(50), default='pending')  # pending, sent, accepted, rejected
     notes = Column(Text)
     created_by = Column(String(255), nullable=False)  # Manufacturer name
@@ -37,9 +34,7 @@ class Quote(Base):
     rejection_reason = Column(Text, nullable=True)
 
 
-# Pydantic Models
 class QuoteCreate(BaseModel):
-    """Schema for creating a quote"""
     notification_id: int
     file_id: int
     part_name: str
@@ -53,7 +48,6 @@ class QuoteCreate(BaseModel):
     notes: Optional[str] = None
 
 class QuoteUpdate(BaseModel):
-    """Schema for updating quote status"""
     status: str  # accepted, rejected
     rejection_reason: Optional[str] = None
 
