@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
-import { FiPlus, FiX, FiCheck, FiDollarSign, FiFileText, FiEye, FiSend, FiTrash2 } from 'react-icons/fi';
+import { FiPlus, FiX, FiCheck, FiFileText, FiEye, FiSend, FiTrash2, FiDownload, FiTrendingUp } from 'react-icons/fi';
 import { fileService } from '../../api/fileService';
 
-export default function QuotationManagement() {
+export default function QuotationManagement({ filterStatus: initialFilter = 'all', onOpenCadViewer }) {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showQuoteModal, setShowQuoteModal] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
-  const [filterStatus, setFilterStatus] = useState('pending');
+  const [modalMode, setModalMode] = useState('create');
+  const [filterStatus, setFilterStatus] = useState(initialFilter);
   const [quoteData, setQuoteData] = useState({
     materialCost: '',
     laborCost: '',
@@ -15,6 +16,12 @@ export default function QuotationManagement() {
     profitMargin: '20',
     notes: '',
   });
+  const [calculatedPricing, setCalculatedPricing] = useState(null);
+  const [loadingPricing, setLoadingPricing] = useState(false);
+
+  useEffect(() => {
+    setFilterStatus(initialFilter);
+  }, [initialFilter]);
 
   useEffect(() => {
     loadQuotationRequests();
@@ -24,7 +31,34 @@ export default function QuotationManagement() {
     setLoading(true);
     try {
       const response = await fileService.getNotifications(100, 0, filterStatus === 'pending');
-      setRequests(response.notifications || []);
+      const notifications = response.notifications || [];
+      const requestsWithStatus = await Promise.all(
+        notifications.map(async (notification) => {
+          try {
+            const quotes = await fileService.getQuotesByNotification(notification.id);
+            if (Array.isArray(quotes) && quotes.length > 0) {
+              const latestQuote = quotes.reduce((latest, current) => {
+                const latestDate = new Date(latest.created_at || 0).getTime();
+                const currentDate = new Date(current.created_at || 0).getTime();
+                return currentDate > latestDate ? current : latest;
+              }, quotes[0]);
+              return {
+                ...notification,
+                quote_status: latestQuote.status,
+                quote_id: latestQuote.id,
+              };
+            }
+          } catch (err) {
+            console.warn('Could not fetch quote status:', err);
+          }
+          return {
+            ...notification,
+            quote_status: null,
+            quote_id: null,
+          };
+        })
+      );
+      setRequests(requestsWithStatus);
     } catch (err) {
       console.error('Error loading quotation requests:', err);
     } finally {
@@ -32,8 +66,9 @@ export default function QuotationManagement() {
     }
   };
 
-  const openQuoteModal = async (request) => {
+  const openQuoteModal = async (request, mode = 'create') => {
     setSelectedRequest(request);
+    setModalMode(mode);
     setQuoteData({
       materialCost: '',
       laborCost: '',
@@ -41,7 +76,46 @@ export default function QuotationManagement() {
       profitMargin: '20',
       notes: '',
     });
+    setCalculatedPricing(null);
     setShowQuoteModal(true);
+    
+    // Auto-calculate pricing if material is available
+    if (mode === 'create' && request.material && request.quantity_unit) {
+      await calculatePricingForRequest(request);
+    }
+  };
+
+  const calculatePricingForRequest = async (request) => {
+    setLoadingPricing(true);
+    try {
+      // Extract quantity from quantity_unit (e.g., "100 pieces" -> 100)
+      const quantityMatch = request.quantity_unit?.match(/(\d+)/);
+      const quantity = quantityMatch ? parseInt(quantityMatch[1]) : 1;
+      
+      const pricingRequest = {
+        material: request.material,
+        quantity: quantity,
+        complexity_factor: 1.0,
+        delivery_days: 7
+      };
+      
+      const pricing = await fileService.calculateQuotePrice(pricingRequest);
+      setCalculatedPricing(pricing);
+      
+      // Auto-fill form with calculated values
+      setQuoteData({
+        materialCost: pricing.base_material_cost.toString(),
+        laborCost: pricing.labor_cost.toString(),
+        machineTime: '0',
+        profitMargin: '20',
+        notes: `Auto-calculated pricing for ${quantity} ${request.material} units. Complexity: ${pricing.complexity_factor}x`
+      });
+    } catch (err) {
+      console.warn('Could not auto-calculate pricing:', err);
+      setCalculatedPricing(null);
+    } finally {
+      setLoadingPricing(false);
+    }
   };
 
   const calculateTotal = () => {
@@ -52,6 +126,29 @@ export default function QuotationManagement() {
     const margin = parseFloat(quoteData.profitMargin) || 0;
     const profit = (subtotal * margin) / 100;
     return (subtotal + profit).toFixed(2);
+  };
+
+  const handleDownloadFile = async (request) => {
+    try {
+      const response = await fileService.requestDownloadUrl(request.object_key);
+      const downloadUrl = response.download_url;
+      if (downloadUrl) {
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = request.part_name || 'file';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    } catch (err) {
+      alert('Failed to download file: ' + err.message);
+    }
+  };
+
+  const openCadViewer = (request) => {
+    if (onOpenCadViewer) {
+      onOpenCadViewer(request);
+    }
   };
 
   const submitQuote = async () => {
@@ -100,7 +197,7 @@ export default function QuotationManagement() {
     switch (status) {
       case 'pending':
         return 'bg-yellow-50 border-yellow-200 text-yellow-700';
-      case 'quote_sent':
+      case 'sent':
         return 'bg-blue-50 border-blue-200 text-blue-700';
       case 'accepted':
         return 'bg-green-50 border-green-200 text-green-700';
@@ -111,8 +208,24 @@ export default function QuotationManagement() {
     }
   };
 
-  const getStatusLabel = (isRead) => {
-    return isRead ? 'Quote Sent' : 'Pending';
+  const getStatusKey = (request) => {
+    if (request.quote_status) {
+      return request.quote_status;
+    }
+    return request.is_read ? 'sent' : 'pending';
+  };
+
+  const getStatusLabel = (status) => {
+    switch (status) {
+      case 'accepted':
+        return 'Accepted';
+      case 'rejected':
+        return 'Rejected';
+      case 'sent':
+        return 'Quote Sent';
+      default:
+        return 'Pending';
+    }
   };
 
   return (
@@ -134,42 +247,23 @@ export default function QuotationManagement() {
 
       {/* Filter Tabs */}
       <div className="bg-white border-b border-slate-200 px-8 py-4">
-        <div className="flex gap-3 items-center justify-between">
-          <div className="flex gap-3">
-            {[
-              { value: 'pending', label: 'Pending Requests', icon: '📋' },
-              { value: 'all', label: 'All Requests', icon: '📁' },
-            ].map((tab) => (
-              <button
-                key={tab.value}
-                onClick={() => setFilterStatus(tab.value)}
-                className={`px-4 py-2 rounded-lg font-medium transition ${
-                  filterStatus === tab.value
-                    ? 'bg-manufacturing-accent text-white'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                }`}
-              >
-                {tab.icon} {tab.label}
-              </button>
-            ))}
-          </div>
-          <button
-            onClick={() => {
-              if (window.confirm('Clear all notifications? This action cannot be undone.')) {
-                fileService.clearAllNotifications()
-                  .then(() => {
-                    loadQuotationRequests();
-                    alert('All notifications cleared');
-                  })
-                  .catch(err => alert('Failed to clear notifications: ' + err.message));
-              }
-            }}
-            className="flex items-center gap-2 px-3 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg font-medium transition"
-            title="Clear all notifications"
-          >
-            <FiTrash2 size={16} />
-            Clear All
-          </button>
+        <div className="flex gap-3">
+          {[
+            { value: 'all', label: 'All Quotes', icon: '📁' },
+            { value: 'pending', label: 'Pending Requests', icon: '📋' },
+          ].map((tab) => (
+            <button
+              key={tab.value}
+              onClick={() => setFilterStatus(tab.value)}
+              className={`px-4 py-2 rounded-lg font-medium transition ${
+                filterStatus === tab.value
+                  ? 'bg-manufacturing-accent text-white'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              {tab.icon} {tab.label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -205,67 +299,43 @@ export default function QuotationManagement() {
                   {/* Header */}
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-xl font-bold text-slate-900">{request.part_name}</h3>
-                        <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(getStatusLabel(request.is_read))}`}>
-                          {getStatusLabel(request.is_read)}
-                        </span>
-                      </div>
-                      <p className="text-sm text-slate-600">
-                        Requested by: <span className="font-semibold">{request.uploaded_by}</span>
+                      <h3 className="text-xl font-bold text-slate-900">{request.part_name}</h3>
+                      <p className="text-sm text-slate-600 mt-1">
+                        Material: {request.material || 'N/A'} &nbsp;•&nbsp; Quantity Unit: {request.quantity_unit || 'N/A'}
                       </p>
                     </div>
                   </div>
-
-                  {/* Details Grid */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 py-4 border-y border-slate-200">
-                    <div>
-                      <p className="text-xs text-slate-500 font-semibold uppercase">Part Number</p>
-                      <p className="text-sm font-mono font-bold text-slate-900 mt-1">
-                        {request.part_number || 'N/A'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500 font-semibold uppercase">Material</p>
-                      <p className="text-sm font-bold text-slate-900 mt-1">
-                        {request.material || 'N/A'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500 font-semibold uppercase">Quantity</p>
-                      <p className="text-sm font-bold text-slate-900 mt-1">
-                        {request.quantity_unit || 'N/A'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500 font-semibold uppercase">Requested On</p>
-                      <p className="text-sm font-bold text-slate-900 mt-1">
-                        {new Date(request.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Description */}
-                  {request.description && (
-                    <div className="mb-4 p-3 bg-slate-50 rounded border border-slate-200">
-                      <p className="text-xs text-slate-600 font-semibold uppercase mb-1">Description</p>
-                      <p className="text-sm text-slate-700">{request.description}</p>
-                    </div>
-                  )}
 
                   {/* Action Buttons */}
                   <div className="flex gap-2 pt-2">
-                    {!request.is_read && (
+                    {!request.quote_status && (
                       <button
-                        onClick={() => openQuoteModal(request)}
-                        className="flex-1 bg-manufacturing-accent hover:bg-manufacturing-accent/90 text-white font-semibold py-2.5 px-4 rounded-lg transition flex items-center justify-center gap-2"
+                        onClick={() => openQuoteModal(request, 'create')}
+                        className={`flex-1 font-semibold py-2.5 px-4 rounded-lg transition flex items-center justify-center gap-2 bg-manufacturing-accent hover:bg-manufacturing-accent/90 text-white`}
+                        title="Create quote"
                       >
                         <FiPlus size={18} />
                         Create Quote
                       </button>
                     )}
                     <button
-                      onClick={() => openQuoteModal(request)}
+                      onClick={() => handleDownloadFile(request)}
+                      className="flex-1 border-2 border-slate-300 text-slate-700 font-semibold py-2.5 px-4 rounded-lg hover:bg-slate-50 transition flex items-center justify-center gap-2"
+                      title="Download CAD file"
+                    >
+                      <FiDownload size={18} />
+                      Download
+                    </button>
+                    <button
+                      onClick={() => openCadViewer(request)}
+                      className="flex-1 border-2 border-slate-300 text-slate-700 font-semibold py-2.5 px-4 rounded-lg hover:bg-slate-50 transition flex items-center justify-center gap-2"
+                      title="View 3D CAD"
+                    >
+                      <FiEye size={18} />
+                      View 3D
+                    </button>
+                    <button
+                      onClick={() => openQuoteModal(request, 'view')}
                       className="flex-1 border-2 border-manufacturing-accent text-manufacturing-accent font-semibold py-2.5 px-4 rounded-lg hover:bg-manufacturing-accent/10 transition flex items-center justify-center gap-2"
                     >
                       <FiEye size={18} />
@@ -286,7 +356,9 @@ export default function QuotationManagement() {
             {/* Modal Header */}
             <div className="sticky top-0 bg-white border-b border-slate-200 px-8 py-6 flex items-center justify-between">
               <div>
-                <h2 className="text-2xl font-bold text-slate-900">Create Quote</h2>
+                <h2 className="text-2xl font-bold text-slate-900">
+                  {modalMode === 'create' ? 'Create Quote' : 'View Details'}
+                </h2>
                 <p className="text-sm text-slate-600 mt-1">{selectedRequest.part_name}</p>
               </div>
               <button
@@ -299,10 +371,54 @@ export default function QuotationManagement() {
 
             {/* Modal Content */}
             <div className="p-8">
+              {modalMode === 'create' && (
+                <>
+                  {/* Auto-Calculated Pricing Info */}
+                  {loadingPricing && (
+                    <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                        <p className="text-sm text-blue-700 font-medium">Calculating pricing from database...</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {calculatedPricing && !loadingPricing && (
+                    <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <FiCheck className="text-green-600 mt-0.5 flex-shrink-0" size={20} />
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-green-900 mb-2">Smart Pricing Applied</p>
+                          <div className="grid grid-cols-2 gap-2 text-xs text-green-800">
+                            <div>
+                              <span className="text-green-600">Base Material:</span> ₹{calculatedPricing.base_material_cost.toFixed(2)}
+                            </div>
+                            <div>
+                              <span className="text-green-600">Labor:</span> ₹{calculatedPricing.labor_cost.toFixed(2)}
+                            </div>
+                            <div>
+                              <span className="text-green-600">Subtotal:</span> ₹{calculatedPricing.subtotal.toFixed(2)}
+                            </div>
+                            <div>
+                              <span className="text-green-600">Complexity:</span> {calculatedPricing.complexity_factor}x
+                            </div>
+                          </div>
+                          <p className="text-xs text-green-700 mt-2">✓ Values pre-filled below. Adjust if needed.</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
               {/* Part Information */}
               <div className="mb-8 p-4 bg-slate-50 rounded-lg border border-slate-200">
                 <h3 className="text-sm font-semibold text-slate-700 uppercase mb-3">Part Information</h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-slate-600">Part Name</p>
+                    <p className="font-bold">{selectedRequest.part_name || 'N/A'}</p>
+                  </div>
                   <div>
                     <p className="text-slate-600">Part Number</p>
                     <p className="font-mono font-bold">{selectedRequest.part_number || 'N/A'}</p>
@@ -316,28 +432,49 @@ export default function QuotationManagement() {
                     <p className="font-bold">{selectedRequest.quantity_unit || 'N/A'}</p>
                   </div>
                   <div>
-                    <p className="text-slate-600">Requested By</p>
-                    <p className="font-bold">{selectedRequest.uploaded_by}</p>
+                    <p className="text-slate-600">Requested On</p>
+                    <p className="font-bold">
+                      {selectedRequest.created_at ? new Date(selectedRequest.created_at).toLocaleDateString() : 'N/A'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-slate-600">Description</p>
+                    <p className="font-bold">{selectedRequest.description || 'N/A'}</p>
                   </div>
                 </div>
               </div>
 
-              {/* Cost Breakdown */}
-              <div className="mb-8">
-                <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-                  <FiDollarSign size={20} className="text-manufacturing-accent" />
-                  Cost Breakdown
-                </h3>
+              {modalMode === 'create' && (
+                <>
+                  {/* Cost Breakdown */}
+                  <div className="mb-8">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <FiTrendingUp size={20} className="text-manufacturing-accent" />
+                    Cost Breakdown
+                  </h3>
+                  {selectedRequest.material && (
+                    <button
+                      onClick={() => calculatePricingForRequest(selectedRequest)}
+                      disabled={loadingPricing}
+                      className="text-sm px-3 py-1.5 bg-manufacturing-accent/10 text-manufacturing-accent hover:bg-manufacturing-accent/20 rounded-lg font-medium transition flex items-center gap-2"
+                    >
+                      <FiTrendingUp size={14} />
+                      {loadingPricing ? 'Calculating...' : 'Auto-Calculate'}
+                    </button>
+                  )}
+                </div>
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-2">
                       Material Cost (₹) <span className="text-red-500">*</span>
+                      {calculatedPricing && <span className="text-xs text-green-600 ml-2">✓ Auto-filled</span>}
                     </label>
                     <input
                       type="number"
                       step="0.01"
                       min="0"
-                      placeholder="0.00"
+                      placeholder={calculatedPricing ? "Auto-calculated" : "0.00"}
                       value={quoteData.materialCost}
                       onChange={(e) =>
                         setQuoteData({ ...quoteData, materialCost: e.target.value })
@@ -349,12 +486,13 @@ export default function QuotationManagement() {
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-2">
                       Labor Cost (₹) <span className="text-red-500">*</span>
+                      {calculatedPricing && <span className="text-xs text-green-600 ml-2">✓ Auto-filled</span>}
                     </label>
                     <input
                       type="number"
                       step="0.01"
                       min="0"
-                      placeholder="0.00"
+                      placeholder={calculatedPricing ? "Auto-calculated" : "0.00"}
                       value={quoteData.laborCost}
                       onChange={(e) =>
                         setQuoteData({ ...quoteData, laborCost: e.target.value })
@@ -378,6 +516,7 @@ export default function QuotationManagement() {
                       }
                       className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-manufacturing-primary focus:border-transparent"
                     />
+                    <p className="text-xs text-slate-500 mt-1">Additional machine/equipment costs</p>
                   </div>
 
                   <div>
@@ -401,13 +540,14 @@ export default function QuotationManagement() {
                 </div>
               </div>
 
-              {/* Notes */}
-              <div className="mb-8">
+                  {/* Notes */}
+                  <div className="mb-8">
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Notes <span className="text-slate-400 text-xs">Optional</span>
+                  Additional Notes <span className="text-slate-400 text-xs">Optional</span>
+                  {calculatedPricing && <span className="text-xs text-blue-600 ml-2">ℹ Auto-filled with pricing details</span>}
                 </label>
                 <textarea
-                  placeholder="Add any notes about this quotation..."
+                  placeholder="Add any notes about this quotation, delivery time, or special requirements..."
                   value={quoteData.notes}
                   onChange={(e) => setQuoteData({ ...quoteData, notes: e.target.value })}
                   rows="3"
@@ -415,8 +555,16 @@ export default function QuotationManagement() {
                 />
               </div>
 
-              {/* Quote Summary */}
-              <div className="bg-gradient-to-r from-manufacturing-accent/10 to-manufacturing-accent/5 rounded-lg p-6 border border-manufacturing-accent/20 mb-8">
+                  {/* Quote Summary */}
+                  <div className="bg-gradient-to-r from-manufacturing-accent/10 to-manufacturing-accent/5 rounded-lg p-6 border border-manufacturing-accent/20 mb-8">
+                {calculatedPricing && (
+                  <div className="mb-4 pb-4 border-b border-manufacturing-accent/20">
+                    <p className="text-xs font-semibold text-manufacturing-accent flex items-center gap-2">
+                      <FiCheck size={14} />
+                      Smart Pricing Active - Values calculated from your material database
+                    </p>
+                  </div>
+                )}
                 <div className="space-y-3">
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-slate-600">Material Cost:</span>
@@ -435,30 +583,38 @@ export default function QuotationManagement() {
                       <span className="text-slate-900 font-bold">Total Quote:</span>
                       <span className="text-3xl font-bold text-manufacturing-accent">₹{calculateTotal()}</span>
                     </div>
+                    {calculatedPricing && (
+                      <p className="text-xs text-slate-600 mt-2 text-right">
+                        Profit margin: {quoteData.profitMargin}% included
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowQuoteModal(false)}
-                  className="flex-1 px-4 py-3 bg-slate-200 text-slate-900 font-semibold rounded-lg hover:bg-slate-300 transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={submitQuote}
-                  className="flex-1 px-4 py-3 bg-manufacturing-accent text-white font-semibold rounded-lg hover:bg-manufacturing-accent/90 transition flex items-center justify-center gap-2"
-                >
-                  <FiSend size={18} />
-                  Send Quote
-                </button>
-              </div>
+                  {/* Action Buttons */}
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setShowQuoteModal(false)}
+                      className="flex-1 px-4 py-3 bg-slate-200 text-slate-900 font-semibold rounded-lg hover:bg-slate-300 transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={submitQuote}
+                      className="flex-1 px-4 py-3 bg-manufacturing-accent text-white font-semibold rounded-lg hover:bg-manufacturing-accent/90 transition flex items-center justify-center gap-2"
+                    >
+                      <FiSend size={18} />
+                      Send Quote
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
       )}
+
     </div>
   );
 }

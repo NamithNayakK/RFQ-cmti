@@ -84,4 +84,6 @@ class QuoteListResponse(BaseModel):
     quotes: list[QuoteResponse]
     total_count: int
     pending_count: int
+    sent_count: int
     accepted_count: int
+    rejected_count: int

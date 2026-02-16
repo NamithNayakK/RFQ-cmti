@@ -36,14 +36,17 @@ async def get_quotes_by_status(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    valid_statuses = ['pending', 'sent', 'accepted', 'rejected']
+    valid_statuses = ['all', 'pending', 'sent', 'accepted', 'rejected']
     if status_filter not in valid_statuses:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid status. Must be one of: {valid_statuses}"
         )
-    
-    quotes, _ = QuoteService.get_all_quotes(db, status=status_filter)
+
+    if current_user['role'] == 'buyer':
+        quotes, _ = QuoteService.get_buyer_quotes(db, current_user['username'], status=status_filter)
+    else:
+        quotes, _ = QuoteService.get_manufacturer_quotes(db, current_user['username'], status=status_filter)
     return quotes
 
 @router.get("/notification/{notification_id}", response_model=list[QuoteResponse])
@@ -63,24 +66,52 @@ async def get_quotes(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    from sqlalchemy import and_
-    
-    query = db.query(Quote).filter(Quote.created_by == current_user['username'])
-    
-    if status:
-        valid_statuses = ['pending', 'sent', 'accepted', 'rejected']
-        if status not in valid_statuses:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid status. Must be one of: {valid_statuses}"
-            )
-        query = query.filter(Quote.status == status)
-    
-    total_count = query.count()
-    quotes = query.order_by(Quote.created_at.desc()).limit(limit).offset(offset).all()
-    
-    all_quotes_query = db.query(Quote).filter(Quote.created_by == current_user['username'])
-    
+    valid_statuses = ['pending', 'sent', 'accepted', 'rejected']
+    if status and status not in valid_statuses:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid status. Must be one of: {valid_statuses}"
+        )
+
+    if current_user['role'] == 'buyer':
+        quotes, total_count = QuoteService.get_buyer_quotes(db, current_user['username'], limit, offset, status)
+        from app.models.file_models import File
+        all_quotes_query = db.query(Quote).join(File, Quote.file_id == File.id).filter(File.created_by == current_user['username'])
+    else:
+        quotes, total_count = QuoteService.get_manufacturer_quotes(db, current_user['username'], limit, offset, status)
+        all_quotes_query = db.query(Quote).filter(Quote.created_by == current_user['username'])
+
+    return {
+        "quotes": quotes,
+        "total_count": total_count,
+        "pending_count": all_quotes_query.filter(Quote.status == 'pending').count(),
+        "sent_count": all_quotes_query.filter(Quote.status == 'sent').count(),
+        "accepted_count": all_quotes_query.filter(Quote.status == 'accepted').count(),
+        "rejected_count": all_quotes_query.filter(Quote.status == 'rejected').count(),
+    }
+
+@router.get("/buyer", response_model=QuoteListResponse)
+async def get_buyer_quotes(
+    status: str = Query(None, alias="status"),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    if current_user['role'] != 'buyer':
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Buyer access only")
+
+    valid_statuses = ['all', 'pending', 'sent', 'accepted', 'rejected']
+    if status and status not in valid_statuses:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid status. Must be one of: {valid_statuses}"
+        )
+
+    quotes, total_count = QuoteService.get_buyer_quotes(db, current_user['username'], limit, offset, status)
+    from app.models.file_models import File
+    all_quotes_query = db.query(Quote).join(File, Quote.file_id == File.id).filter(File.created_by == current_user['username'])
+
     return {
         "quotes": quotes,
         "total_count": total_count,

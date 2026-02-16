@@ -114,7 +114,7 @@ export default function Dashboard({ onBrowseAll }) {
             {stats.recentUploads.map((file) => (
               <div key={file.id} className="flex items-center justify-between border border-slate-200 rounded-lg px-4 py-3">
                 <div>
-                  <p className="text-sm font-medium text-slate-900">{file.uploaded_by || file.original_name}</p>
+                  <p className="text-sm font-medium text-slate-900">{file.original_name}</p>
                   <p className="text-xs text-slate-500">{new Date(file.created_at).toLocaleDateString()}</p>
                 </div>
               </div>

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { FiBell, FiX, FiCheck } from 'react-icons/fi';
+import { FiBell, FiX, FiCheck, FiTrash2 } from 'react-icons/fi';
 import { fileService } from '../api/fileService';
 
-export default function NotificationCenter({ onClose }) {
+export default function NotificationCenter({ onClose, onNotificationClick }) {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -32,6 +32,13 @@ export default function NotificationCenter({ onClose }) {
       loadNotifications();
     } catch (err) {
       console.error('Error marking notification as read:', err);
+    }
+  };
+
+  const handleNotificationClick = async (notificationId) => {
+    await handleMarkAsRead(notificationId);
+    if (onNotificationClick) {
+      onNotificationClick();
     }
   };
 
@@ -92,7 +99,7 @@ export default function NotificationCenter({ onClose }) {
               <div className="text-center">
                 <FiBell size={40} className="text-slate-300 mx-auto mb-2" />
                 <p className="text-slate-500 font-medium">No notifications</p>
-                <p className="text-xs text-slate-400">New uploads will appear here</p>
+                <p className="text-xs text-slate-400">New updates will appear here</p>
               </div>
             </div>
           ) : (
@@ -103,7 +110,7 @@ export default function NotificationCenter({ onClose }) {
                   className={`p-4 hover:bg-slate-50 transition cursor-pointer ${
                     !notification.is_read ? 'bg-blue-50' : ''
                   }`}
-                  onClick={() => handleMarkAsRead(notification.id)}
+                  onClick={() => handleNotificationClick(notification.id)}
                 >
                   <div className="flex gap-3">
                     <div className="flex-1">
@@ -118,10 +125,12 @@ export default function NotificationCenter({ onClose }) {
                           Part #: {notification.part_number}
                         </p>
                       )}
-                      <p className="text-xs text-slate-500 mt-2">
-                        Uploaded by: {notification.uploaded_by || 'Unknown'}
-                      </p>
-                      <p className="text-xs text-slate-400 mt-1">
+                      {notification.description && (
+                        <p className="text-xs text-slate-600 mt-1">
+                          {notification.description}
+                        </p>
+                      )}
+                      <p className="text-xs text-slate-400 mt-2">
                         {formatDate(notification.created_at)}
                       </p>
                     </div>
@@ -136,17 +145,23 @@ export default function NotificationCenter({ onClose }) {
         </div>
 
         {/* Footer */}
-        {unreadCount > 0 && (
-          <div className="px-6 py-3 border-t border-slate-200 bg-slate-50">
-            <button
-              onClick={handleMarkAllAsRead}
-              className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-manufacturing-accent hover:text-manufacturing-accent/80"
-            >
-              <FiCheck size={16} />
-              Mark all as read
-            </button>
-          </div>
-        )}
+        <div className="px-6 py-3 border-t border-slate-200 bg-slate-50 flex items-center gap-2">
+          <button
+            onClick={handleMarkAllAsRead}
+            className="flex-1 flex items-center justify-center gap-2 text-sm font-semibold text-manufacturing-accent hover:text-manufacturing-accent/80"
+          >
+            <FiCheck size={16} />
+            Mark all as read
+          </button>
+          <button
+            onClick={handleMarkAllAsRead}
+            className="flex items-center justify-center gap-2 text-sm font-semibold text-slate-600 hover:text-slate-800"
+            title="Clear notifications"
+          >
+            <FiTrash2 size={16} />
+            Clear
+          </button>
+        </div>
       </div>
     </div>
   );

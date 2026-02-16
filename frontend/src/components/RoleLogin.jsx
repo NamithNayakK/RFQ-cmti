@@ -49,15 +49,15 @@ export default function RoleLogin({ onRoleSelect }) {
               <p className={`text-sm mb-4 transition-colors ${
                 selectedRole === 'buyer' ? 'text-slate-600' : 'text-white/70'
               }`}>
-                Upload CAD files, search inventory, manage uploads
+                Request quotes for CAD parts, track requests, manage files
               </p>
               <ul className={`text-xs space-y-2 mb-6 transition-colors ${
                 selectedRole === 'buyer' ? 'text-slate-600' : 'text-white/70'
               }`}>
+                <li>✓ Request quotes for parts</li>
                 <li>✓ Upload STP/IGES files</li>
                 <li>✓ Search and download</li>
-                <li>✓ File management</li>
-                <li>✓ Dashboard</li>
+                <li>✓ Quote tracking</li>
               </ul>
               {selectedRole === 'buyer' && (
                 <div className="flex items-center justify-center gap-2 text-manufacturing-accent font-semibold">

@@ -17,7 +17,6 @@ def create_notification(
     material: Optional[str],
     part_number: Optional[str],
     quantity_unit: Optional[str],
-    uploaded_by: Optional[str],
     description: Optional[str],
 ) -> Notification:
     """Create a new notification for manufacturer when buyer uploads file"""
@@ -28,7 +27,6 @@ def create_notification(
         material=material,
         part_number=part_number,
         quantity_unit=quantity_unit,
-        uploaded_by=uploaded_by,
         description=description,
         is_read=False,
     )

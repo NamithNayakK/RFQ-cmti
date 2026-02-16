@@ -50,9 +50,8 @@ export const fileService = {
   },
 
   // Get list of files
-  listFiles: async (limit = 50, offset = 0, uploadedBy = null) => {
+  listFiles: async (limit = 50, offset = 0) => {
     const params = { limit, offset };
-    if (uploadedBy) params.uploaded_by = uploadedBy;
     const response = await api.get('/files/list', { params });
     return response.data;
   },
@@ -72,6 +71,12 @@ export const fileService = {
   // Request download URL
   requestDownloadUrl: async (objectKey) => {
     const response = await api.get(`/files/download/${objectKey}`);
+    return response.data;
+  },
+
+  // Request mesh URL (for 3D viewer)
+  requestMeshUrl: async (objectKey) => {
+    const response = await api.get(`/files/mesh/${objectKey}`);
     return response.data;
   },
 
@@ -138,6 +143,13 @@ export const fileService = {
     const params = { limit, offset };
     if (status) params.status = status;
     const response = await api.get('/quotes', { params });
+    return response.data;
+  },
+
+  getBuyerQuotes: async (status = null, limit = 50, offset = 0) => {
+    const params = { limit, offset };
+    if (status) params.status = status;
+    const response = await api.get('/quotes/buyer', { params });
     return response.data;
   },
 
@@ -212,6 +224,39 @@ export const fileService = {
 
   clearAllNotifications: async () => {
     const response = await api.delete('/notifications/');
+    return response.data;
+  },
+
+  // Pricing Management
+  createMaterialPrice: async (pricingData) => {
+    const response = await api.post('/pricing/materials', pricingData);
+    return response.data;
+  },
+
+  getMaterialPrices: async (limit = 50, offset = 0) => {
+    const response = await api.get('/pricing/materials', {
+      params: { limit, offset }
+    });
+    return response.data;
+  },
+
+  getMaterialPrice: async (materialName) => {
+    const response = await api.get(`/pricing/materials/${materialName}`);
+    return response.data;
+  },
+
+  updateMaterialPrice: async (materialName, pricingData) => {
+    const response = await api.put(`/pricing/materials/${materialName}`, pricingData);
+    return response.data;
+  },
+
+  deleteMaterialPrice: async (materialName) => {
+    const response = await api.delete(`/pricing/materials/${materialName}`);
+    return response.data;
+  },
+
+  calculateQuotePrice: async (pricingRequest) => {
+    const response = await api.post('/pricing/calculate', pricingRequest);
     return response.data;
   },
 };

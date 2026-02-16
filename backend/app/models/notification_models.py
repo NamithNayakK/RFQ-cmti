@@ -18,7 +18,6 @@ class Notification(Base):
     material = Column(String, nullable=True)  # Material type
     part_number = Column(String, nullable=True)  # Part number
     quantity_unit = Column(String, nullable=True)  # Quantity unit
-    uploaded_by = Column(String, nullable=True)  # Buyer email/ID
     description = Column(String, nullable=True)  # File description
     is_read = Column(Boolean, default=False, nullable=False)  # Notification read status
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
@@ -34,7 +33,6 @@ class NotificationResponse(BaseModel):
     material: Optional[str]
     part_number: Optional[str]
     quantity_unit: Optional[str]
-    uploaded_by: Optional[str]
     description: Optional[str]
     is_read: bool
     created_at: datetime

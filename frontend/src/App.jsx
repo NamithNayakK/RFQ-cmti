@@ -1,5 +1,5 @@
 import './index.css';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FiHome, FiFolder, FiUpload, FiBell, FiUser, FiPackage, FiLogOut, FiDollarSign } from 'react-icons/fi';
 import FileUpload from './components/FileUpload';
 import FileList from './components/FileList';
@@ -8,11 +8,17 @@ import BuyerQuotes from './pages/buyer/BuyerQuotes';
 
 function App({ onLogout }) {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [activeNav, setActiveNav] = useState('Dashboard');
+  const [activeNav, setActiveNav] = useState(() => {
+    return localStorage.getItem('buyerActivePage') || 'Dashboard';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('buyerActivePage', activeNav);
+  }, [activeNav]);
 
   const handleUploadSuccess = () => {
     // Trigger file list refresh
-    setRefreshTrigger(prev => prev + 1);
+    setRefreshTrigger((prev) => prev + 1);
     setActiveNav('All Files');
   };
 
@@ -36,7 +42,7 @@ function App({ onLogout }) {
           {[
             { name: 'Dashboard', icon: FiHome },
             { name: 'All Files', icon: FiFolder },
-            { name: 'Upload', icon: FiUpload },
+            { name: 'Request Quote', icon: FiUpload },
             { name: 'Quotations', icon: FiDollarSign },
           ].map((item) => {
             const Icon = item.icon;
@@ -60,8 +66,7 @@ function App({ onLogout }) {
           })}
         </nav>
 
-        <div className="mt-auto px-6 pb-6">
-        </div>
+        <div className="mt-auto px-6 pb-6"></div>
       </aside>
 
       {/* Main Content */}
@@ -76,7 +81,7 @@ function App({ onLogout }) {
               <p className="text-sm text-slate-500">
                 {activeNav === 'Dashboard' && 'Overview of your CAD file storage'}
                 {activeNav === 'All Files' && 'Manage your CAD files'}
-                {activeNav === 'Upload' && 'Upload new CAD files'}
+                {activeNav === 'Request Quote' && 'Submit CAD files for quotation'}
                 {activeNav === 'Quotations' && 'Review and manage quotations from manufacturers'}
               </p>
             </div>
@@ -104,16 +109,12 @@ function App({ onLogout }) {
         <main className="px-8 py-8">
           <div className="max-w-6xl mx-auto">
             {activeNav === 'Dashboard' && (
-              <Dashboard
-                onBrowseAll={() => setActiveNav('All Files')}
-              />
+              <Dashboard onBrowseAll={() => setActiveNav('All Files')} />
             )}
             {activeNav === 'All Files' && (
-              <FileList
-                refreshTrigger={refreshTrigger}
-              />
+              <FileList refreshTrigger={refreshTrigger} />
             )}
-            {activeNav === 'Upload' && (
+            {activeNav === 'Request Quote' && (
               <FileUpload onUploadSuccess={handleUploadSuccess} />
             )}
             {activeNav === 'Quotations' && (

@@ -50,3 +50,6 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "480"
 MATERIAL_PRICE_CACHE_MINUTES = int(os.getenv("MATERIAL_PRICE_CACHE_MINUTES", "1440"))  # 24 hours
 DEFAULT_LABOR_COST_INR = float(os.getenv("DEFAULT_LABOR_COST_INR", "350"))  # ₹/hour
 DEFAULT_MACHINE_COST_INR = float(os.getenv("DEFAULT_MACHINE_COST_INR", "500"))  # ₹/hour
+
+# FreeCAD for mesh generation (set to FreeCADCmd or FreeCADCmd.exe)
+FREECAD_CMD = os.getenv("FREECAD_CMD", "FreeCADCmd")

@@ -176,27 +176,11 @@ export default function FileList({ refreshTrigger }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-6">
           {sortedFiles.map((file) => (
             <div key={file.id} className="bg-white border border-slate-200 rounded-xl overflow-hidden hover:shadow-md transition flex flex-col">
-              {/* Image Container */}
-              <div className="w-full h-40 bg-slate-50 border-b border-slate-200 flex items-center justify-center overflow-hidden flex-shrink-0">
-                {file.thumbnail_data ? (
-                  <img
-                    src={file.thumbnail_data}
-                    alt={`${file.original_name} preview`}
-                    className="w-full h-full object-contain p-4"
-                  />
-                ) : (
-                  <div className="flex flex-col items-center justify-center text-slate-400">
-                    <FiEye size={32} className="mb-2" />
-                    <span className="text-xs">No preview</span>
-                  </div>
-                )}
-              </div>
-
               {/* Card Content */}
               <div className="p-4 flex flex-col flex-grow">
                 {/* Part Name */}
                 <h3 className="font-semibold text-slate-900 text-sm line-clamp-2 mb-3">
-                  {file.uploaded_by || file.original_name}
+                  {file.original_name}
                 </h3>
 
                 {/* File Info */}

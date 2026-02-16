@@ -40,7 +40,7 @@ class QuoteService:
                 quote_id=quote.id,
                 file_id=quote_data.file_id,
                 sent_by=created_by,
-                sent_to=file_record.uploaded_by,
+                sent_to=file_record.created_by or "buyer",
                 part_name=quote_data.part_name,
                 is_read=False
             )
@@ -75,11 +75,22 @@ class QuoteService:
         return quotes, total_count
 
     @staticmethod
-    def get_manufacturer_quotes(db: Session, created_by: str, limit: int = 50, offset: int = 0) -> tuple[list[Quote], int]:
+    def get_manufacturer_quotes(db: Session, created_by: str, limit: int = 50, offset: int = 0, status: str = None) -> tuple[list[Quote], int]:
         query = db.query(Quote).filter(Quote.created_by == created_by)
+        if status and status != 'all':
+            query = query.filter(Quote.status == status)
         total_count = query.count()
         quotes = query.order_by(Quote.created_at.desc()).limit(limit).offset(offset).all()
         
+        return quotes, total_count
+
+    @staticmethod
+    def get_buyer_quotes(db: Session, buyer_username: str, limit: int = 50, offset: int = 0, status: str = None) -> tuple[list[Quote], int]:
+        query = db.query(Quote).join(File, Quote.file_id == File.id).filter(File.created_by == buyer_username)
+        if status and status != 'all':
+            query = query.filter(Quote.status == status)
+        total_count = query.count()
+        quotes = query.order_by(Quote.created_at.desc()).limit(limit).offset(offset).all()
         return quotes, total_count
 
     @staticmethod
@@ -124,6 +135,24 @@ class QuoteService:
             quote.rejection_reason = rejection_reason
             db.commit()
             db.refresh(quote)
+
+            try:
+                from app.services.notification_service import create_notification
+
+                file_record = db.query(File).filter(File.id == quote.file_id).first()
+                if file_record:
+                    create_notification(
+                        db=db,
+                        file_id=file_record.id,
+                        object_key=file_record.object_key,
+                        part_name=quote.part_name,
+                        material=quote.material,
+                        part_number=quote.part_number,
+                        quantity_unit=quote.quantity_unit,
+                        description="Quote rejected by buyer",
+                    )
+            except Exception:
+                pass
         return quote
 
     @staticmethod

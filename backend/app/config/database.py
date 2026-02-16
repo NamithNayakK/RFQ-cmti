@@ -25,16 +25,18 @@ def get_db():
 
 def init_db():
     from app.models import file_models, notification_models, quote_models, quote_notification_models, user_models
+    from app.routes.pricing import MaterialPrice
     Base.metadata.create_all(bind=engine)
 
-
-def ensure_thumbnail_column():
     with engine.begin() as conn:
-        result = conn.execute(
-            text(
-                "SELECT 1 FROM information_schema.columns "
-                "WHERE table_name = 'files' AND column_name = 'thumbnail_data'"
-            )
-        )
-        if not result.fetchone():
-            conn.execute(text("ALTER TABLE files ADD COLUMN thumbnail_data TEXT"))
+        try:
+            conn.execute(text("ALTER TABLE files ADD COLUMN created_by VARCHAR"))
+        except Exception:
+            pass
+        try:
+            conn.execute(text("UPDATE files SET created_by = 'buyer' WHERE created_by IS NULL"))
+        except Exception:
+            pass
+
+
+

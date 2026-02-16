@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { FiUpload, FiAlertCircle } from 'react-icons/fi';
 import { fileService } from '../api/fileService';
+import CustomSelect from './CustomSelect';
 
 export default function FileUpload({ onUploadSuccess }) {
   const [loading, setLoading] = useState(false);
@@ -33,6 +34,17 @@ export default function FileUpload({ onUploadSuccess }) {
       setThumbnailGenerating(true);
       setThumbnailError(null);
 
+      const fileName = file.name.toLowerCase();
+      const isStepOrIges = fileName.endsWith('.stp') || fileName.endsWith('.step') || fileName.endsWith('.igs') || fileName.endsWith('.iges');
+
+      // Only generate thumbnails for STEP/IGES files
+      if (!isStepOrIges) {
+        setThumbnailData(null);
+        setThumbnailError('Preview not available for this format. STEP and IGES files only.');
+        setThumbnailGenerating(false);
+        return;
+      }
+
       const [occtModule, threeModule] = await Promise.all([
         import('occt-import-js'),
         import('three')
@@ -44,7 +56,7 @@ export default function FileUpload({ onUploadSuccess }) {
       });
       const THREE = threeModule;
 
-      const isIges = file.name.toLowerCase().endsWith('.igs') || file.name.toLowerCase().endsWith('.iges');
+      const isIges = fileName.endsWith('.igs') || fileName.endsWith('.iges');
       const buffer = new Uint8Array(await file.arrayBuffer());
 
       const readStep = occt.ReadStepFile || occt.ReadSTEPFile;
@@ -151,8 +163,11 @@ export default function FileUpload({ onUploadSuccess }) {
     const file = e.target.files[0];
     if (file) {
       const fileName = file.name.toLowerCase();
-      if (!fileName.endsWith('.stp') && !fileName.endsWith('.step') && !fileName.endsWith('.igs') && !fileName.endsWith('.iges')) {
-        setError('Only .stp, .step, .igs, or .iges files are allowed');
+      const allowedExtensions = ['.stp', '.step', '.igs', '.iges', '.stl', '.dxf', '.dwg', '.x_t', '.x_b', '.sat', '.3dm', '.prt', '.sldprt', '.sldasm', '.fcstd'];
+      const hasValidExtension = allowedExtensions.some(ext => fileName.endsWith(ext));
+      
+      if (!hasValidExtension) {
+        setError(`Only CAD files are allowed: ${allowedExtensions.join(', ')}`);
         return;
       }
       if (file.size > 500 * 1024 * 1024) {
@@ -204,13 +219,10 @@ export default function FileUpload({ onUploadSuccess }) {
       const uploadData = {
         filename: formData.filename,
         content_type: contentType,
-        file_size: file?.size,
-        uploaded_by: formData.partName || 'unknown',
         description: formData.description || '',
         material: formData.material || '',
         part_number: formData.partNumber || '',
         quantity_unit: formData.quantityUnit || 'pieces',
-        thumbnail_data: thumbnailData || null,
       };
 
       const urlResponse = await fileService.requestUploadUrl(uploadData);
@@ -228,7 +240,7 @@ export default function FileUpload({ onUploadSuccess }) {
       
       await fileService.uploadFile(upload_url, file, setProgress);
 
-      setSuccess(`File "${formData.filename}" uploaded successfully! File ID: ${file_id}`);
+      setSuccess(`Quote request submitted successfully! Your request for "${formData.filename}" has been sent to manufacturers.`);
       setFormData({ filename: '', partName: '', description: '', material: '', partNumber: '', quantityUnit: '', numberOfPieces: '' });
       setThumbnailData(null);
       setThumbnailError(null);
@@ -255,9 +267,9 @@ export default function FileUpload({ onUploadSuccess }) {
       <div>
         <h2 className="text-2xl font-semibold text-slate-900 flex items-center gap-2 mb-2">
           <FiUpload className="text-manufacturing-primary" />
-          Upload CAD File
+          Request for Quote
         </h2>
-        <p className="text-sm text-slate-500 mb-6">Upload a .stp, .step, .igs, or .iges CAD file. Maximum file size is 500 MB.</p>
+        <p className="text-sm text-slate-500 mb-6">Upload any CAD file (.STEP, .IGES, .STL, .DXF, .DWG, .SAT, .3DM, .PRT, .SLDPRT, .FCSTD, etc). Maximum file size is 500 MB.</p>
       </div>
 
       {error && (
@@ -283,7 +295,7 @@ export default function FileUpload({ onUploadSuccess }) {
           <div className="relative border-2 border-dashed border-slate-200 rounded-xl p-8 text-center hover:border-manufacturing-primary transition bg-slate-50">
             <input
               type="file"
-              accept=".stp,.step,.igs,.iges,.STP,.STEP,.IGS,.IGES"
+              accept=".stp,.step,.igs,.iges,.stl,.dxf,.dwg,.x_t,.x_b,.sat,.iges,.iges,.3dm,.prt,.sldprt,.sldasm,.fcstd,.STP,.STEP,.IGS,.IGES,.STL,.DXF,.DWG,.SAT,.3DM,.PRT,.SLDPRT,.SLDASM,.FCSTD"
               onChange={handleFileChange}
               disabled={loading}
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
@@ -334,61 +346,68 @@ export default function FileUpload({ onUploadSuccess }) {
             />
           </div>
         </div>
+        {/* Description */}
+        <div>
+          <label htmlFor="description" className="block text-sm font-medium text-slate-700 mb-2">
+            Description
+          </label>
+          <textarea
+            id="description"
+            name="description"
+            placeholder="e.g., Upper control arm CAD file - Rev 2"
+            value={formData.description}
+            onChange={handleInputChange}
+            disabled={loading}
+            rows="3"
+            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-manufacturing-primary focus:border-transparent"
+          />
+        </div>
 
-        {/* Material and Quantity Unit - Side by Side */}
+        {/* Material and Quantity Unit - Moved to Bottom for Dropdown Space */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label htmlFor="material" className="block text-sm font-medium text-slate-700 mb-2">
               Material <span className="text-red-500">*</span>
             </label>
-            <select
+            <CustomSelect
               id="material"
               name="material"
               value={formData.material}
               onChange={handleInputChange}
               disabled={loading}
-              required
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-manufacturing-primary focus:border-transparent"
-            >
-              <option value="">Select material...</option>
-              <optgroup label="Metals">
-                <option value="Aluminum">Aluminum</option>
-                <option value="Steel">Steel</option>
-                <option value="Stainless Steel">Stainless Steel</option>
-                <option value="Carbon Steel">Carbon Steel</option>
-                <option value="Brass">Brass</option>
-                <option value="Copper">Copper</option>
-                <option value="Bronze">Bronze</option>
-                <option value="Titanium">Titanium</option>
-                <option value="Cast Iron">Cast Iron</option>
-                <option value="Zinc">Zinc</option>
-              </optgroup>
-              <optgroup label="Plastics">
-                <option value="ABS">ABS</option>
-                <option value="PLA">PLA</option>
-                <option value="PETG">PETG</option>
-                <option value="Nylon">Nylon</option>
-                <option value="Polycarbonate">Polycarbonate</option>
-                <option value="Acetal (Delrin)">Acetal (Delrin)</option>
-                <option value="PEEK">PEEK</option>
-                <option value="Polypropylene">Polypropylene</option>
-                <option value="PVC">PVC</option>
-                <option value="HDPE">HDPE</option>
-              </optgroup>
-              <optgroup label="Composites">
-                <option value="Carbon Fiber">Carbon Fiber</option>
-                <option value="Fiberglass">Fiberglass</option>
-                <option value="G10/FR4">G10/FR4</option>
-              </optgroup>
-              <optgroup label="Other">
-                <option value="Wood">Wood</option>
-                <option value="Rubber">Rubber</option>
-                <option value="Silicone">Silicone</option>
-                <option value="Ceramic">Ceramic</option>
-                <option value="Glass">Glass</option>
-                <option value="Other">Other</option>
-              </optgroup>
-            </select>
+              placeholder="Select material..."
+              options={[
+                { value: 'Aluminum', label: 'Aluminum' },
+                { value: 'Steel', label: 'Steel' },
+                { value: 'Stainless Steel', label: 'Stainless Steel' },
+                { value: 'Carbon Steel', label: 'Carbon Steel' },
+                { value: 'Brass', label: 'Brass' },
+                { value: 'Copper', label: 'Copper' },
+                { value: 'Bronze', label: 'Bronze' },
+                { value: 'Titanium', label: 'Titanium' },
+                { value: 'Cast Iron', label: 'Cast Iron' },
+                { value: 'Zinc', label: 'Zinc' },
+                { value: 'ABS', label: 'ABS' },
+                { value: 'PLA', label: 'PLA' },
+                { value: 'PETG', label: 'PETG' },
+                { value: 'Nylon', label: 'Nylon' },
+                { value: 'Polycarbonate', label: 'Polycarbonate' },
+                { value: 'Acetal (Delrin)', label: 'Acetal (Delrin)' },
+                { value: 'PEEK', label: 'PEEK' },
+                { value: 'Polypropylene', label: 'Polypropylene' },
+                { value: 'PVC', label: 'PVC' },
+                { value: 'HDPE', label: 'HDPE' },
+                { value: 'Carbon Fiber', label: 'Carbon Fiber' },
+                { value: 'Fiberglass', label: 'Fiberglass' },
+                { value: 'G10/FR4', label: 'G10/FR4' },
+                { value: 'Wood', label: 'Wood' },
+                { value: 'Rubber', label: 'Rubber' },
+                { value: 'Silicone', label: 'Silicone' },
+                { value: 'Ceramic', label: 'Ceramic' },
+                { value: 'Glass', label: 'Glass' },
+                { value: 'Other', label: 'Other' },
+              ]}
+            />
           </div>
 
           {/* Quantity Unit Field */}
@@ -432,30 +451,23 @@ export default function FileUpload({ onUploadSuccess }) {
           </div>
         )}
 
-        {/* Description */}
-        <div>
-          <label htmlFor="description" className="block text-sm font-medium text-slate-700 mb-2">
-            Description
-          </label>
-          <textarea
-            id="description"
-            name="description"
-            placeholder="e.g., Upper control arm CAD file - Rev 2"
-            value={formData.description}
-            onChange={handleInputChange}
-            disabled={loading}
-            rows="3"
-            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-manufacturing-primary focus:border-transparent"
-          />
-        </div>
-
-        {/* Progress Bar */}
-        {progress > 0 && (
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div
-              className="bg-manufacturing-accent h-2 rounded-full transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            ></div>
+        {/* Upload Progress */}
+        {loading && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs text-slate-600">
+              <span>Uploading...</span>
+              <span>{progress}%</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+              {progress > 0 ? (
+                <div
+                  className="bg-manufacturing-accent h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${progress}%` }}
+                ></div>
+              ) : (
+                <div className="h-2 w-1/3 bg-manufacturing-accent animate-pulse"></div>
+              )}
+            </div>
           </div>
         )}
 
@@ -467,7 +479,7 @@ export default function FileUpload({ onUploadSuccess }) {
             className="bg-manufacturing-accent hover:opacity-90 text-white font-semibold py-2.5 px-5 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             <FiUpload />
-            {loading ? 'Uploading...' : 'Upload File'}
+            {loading ? 'Submitting Request...' : 'Request Quote'}
           </button>
         </div>
       </form>

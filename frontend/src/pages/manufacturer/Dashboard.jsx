@@ -2,10 +2,24 @@ import { useEffect, useState, useMemo } from 'react';
 import { FiTrendingUp, FiClock, FiShoppingCart, FiAlertCircle, FiFileText, FiCheckCircle } from 'react-icons/fi';
 import { fileService } from '../../api/fileService';
 
-export default function ManufacturerDashboard({ onRefresh }) {
+export default function ManufacturerDashboard({ onRefresh, onNavigate }) {
   const [production, setProduction] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [rejectedQuotesCount, setRejectedQuotesCount] = useState(0);
+  const [rejectedQuotes, setRejectedQuotes] = useState([]);
+  const [showRejectedModal, setShowRejectedModal] = useState(false);
+
+  const parseQuantityValue = (quantityUnit) => {
+    if (typeof quantityUnit === 'number') {
+      return quantityUnit;
+    }
+    if (typeof quantityUnit === 'string') {
+      const match = quantityUnit.match(/\d+(?:\.\d+)?/);
+      return match ? Number(match[0]) : 0;
+    }
+    return 0;
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -18,6 +32,11 @@ export default function ManufacturerDashboard({ onRefresh }) {
         // Load accepted quotes from backend
         const response = await fileService.getQuotes('accepted', 100);
         const acceptedQuotes = response.quotes || [];
+
+        // Load rejected quotes count
+        const rejectedResponse = await fileService.getQuotes('rejected', 100, 0);
+        setRejectedQuotesCount(rejectedResponse.total_count || 0);
+        setRejectedQuotes(rejectedResponse.quotes || []);
 
         // Transform quotes into production items
         const productionItems = acceptedQuotes.map((quote) => ({
@@ -35,6 +54,7 @@ export default function ManufacturerDashboard({ onRefresh }) {
       } catch (err) {
         console.error('Error loading production data:', err);
         setProduction([]);
+        setRejectedQuotesCount(0);
       } finally {
         setLoading(false);
       }
@@ -46,18 +66,17 @@ export default function ManufacturerDashboard({ onRefresh }) {
   const stats = useMemo(() => {
     const pendingRequests = notifications.filter(n => !n.is_read).length;
     const quotesSent = notifications.filter(n => n.is_read).length;
-    const activeProjects = production.filter(p => p.status === 'In Progress').length;
     const pendingOrders = production.filter(p => p.status === 'Pending').length;
-    const totalItems = production.reduce((sum, p) => sum + p.quantity, 0);
+    const totalItems = production.reduce((sum, p) => sum + parseQuantityValue(p.quantity), 0);
     
     return {
       pendingRequests,
       quotesSent,
-      activeProjects,
       pendingOrders,
-      totalItems
+      totalItems,
+      rejectedQuotes: rejectedQuotesCount
     };
-  }, [production, notifications]);
+  }, [production, notifications, rejectedQuotesCount, rejectedQuotes]);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -75,8 +94,8 @@ export default function ManufacturerDashboard({ onRefresh }) {
   return (
     <div className="space-y-6">
       {/* Statistics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-        <div className="bg-white rounded-2xl border border-slate-200 p-5">
+      <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-4 gap-5">
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 cursor-pointer hover:shadow-md transition" onClick={() => onNavigate('Quotations', 'pending')}>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-slate-500">Pending Requests</p>
@@ -89,7 +108,7 @@ export default function ManufacturerDashboard({ onRefresh }) {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200 p-5">
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 cursor-pointer hover:shadow-md transition" onClick={() => onNavigate('Quotations', 'all')}>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-slate-500">Quotes Sent</p>
@@ -102,20 +121,20 @@ export default function ManufacturerDashboard({ onRefresh }) {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200 p-5">
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 cursor-pointer hover:shadow-md transition" onClick={() => setShowRejectedModal(true)}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-500">Active Projects</p>
-              <p className="text-3xl font-semibold text-slate-900">{stats.activeProjects}</p>
-              <p className="text-xs text-slate-500 mt-1">In manufacturing</p>
+              <p className="text-sm text-slate-500">Rejected Quotes</p>
+              <p className="text-3xl font-semibold text-slate-900">{stats.rejectedQuotes}</p>
+              <p className="text-xs text-slate-500 mt-1">Buyer rejected</p>
             </div>
-            <div className="h-12 w-12 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center">
-              <FiTrendingUp size={24} />
+            <div className="h-12 w-12 rounded-xl bg-red-100 text-red-600 flex items-center justify-center">
+              <FiAlertCircle size={24} />
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200 p-5">
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 cursor-pointer hover:shadow-md transition" onClick={() => onNavigate('Orders')}>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-slate-500">Total Items</p>
@@ -178,6 +197,43 @@ export default function ManufacturerDashboard({ onRefresh }) {
           </div>
         )}
       </div>
+
+      {/* Rejected Quotes Modal */}
+      {showRejectedModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl max-w-2xl w-full mx-4 max-h-96 overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-slate-200 p-6 flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-slate-900">Rejected Quotes</h2>
+              <button
+                onClick={() => setShowRejectedModal(false)}
+                className="text-slate-500 hover:text-slate-700 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="p-6">
+              {rejectedQuotes.length === 0 ? (
+                <p className="text-slate-500 text-center py-8">No rejected quotes</p>
+              ) : (
+                <div className="space-y-4">
+                  {rejectedQuotes.map((quote) => (
+                    <div key={quote.id} className="border border-red-200 rounded-lg p-4 bg-red-50">
+                      <p className="font-semibold text-slate-900 text-lg">{quote.part_name}</p>
+                      <p className="text-sm text-slate-600 mt-2">
+                        <span className="font-semibold">Rejection Reason:</span> {quote.rejection_reason || 'No reason provided'}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-2">
+                        Rejected at: {new Date(quote.rejected_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

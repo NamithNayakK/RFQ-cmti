@@ -14,8 +14,7 @@ def generate_upload_url(
     filename: str, 
     content_type: str, 
     db: Session,
-    file_size: Optional[int] = None,
-    uploaded_by: Optional[str] = None,
+    created_by: str,
     description: Optional[str] = None,
     material: Optional[str] = None,
     part_number: Optional[str] = None,
@@ -52,12 +51,11 @@ def generate_upload_url(
         object_key=object_key,
         original_name=filename,
         content_type=content_type,
-        file_size=file_size,
-        uploaded_by=uploaded_by,
         description=description,
         material=material,
         part_number=part_number,
         quantity_unit=quantity_unit,
+        created_by=created_by,
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow()
     )
@@ -74,7 +72,6 @@ def generate_upload_url(
         material=material,
         part_number=part_number,
         quantity_unit=quantity_unit,
-        uploaded_by=uploaded_by,
         description=description,
     )
 
@@ -112,13 +109,9 @@ def get_file_by_object_key(object_key: str, db: Session) -> Optional[File]:
 def list_files(
     db: Session,
     limit: int = 100,
-    offset: int = 0,
-    uploaded_by: Optional[str] = None
+    offset: int = 0
 ) -> tuple[List[File], int]:
     query = db.query(File)
-    
-    if uploaded_by:
-        query = query.filter(File.uploaded_by == uploaded_by)
     
     total = query.count()
     files = query.order_by(File.created_at.desc()).offset(offset).limit(limit).all()
@@ -131,9 +124,6 @@ def search_files(search_params: FileSearchRequest, db: Session) -> tuple[List[Fi
     
     if search_params.query:
         query = query.filter(File.original_name.ilike(f"%{search_params.query}%"))
-    
-    if search_params.uploaded_by:
-        query = query.filter(File.uploaded_by == search_params.uploaded_by)
     
     if search_params.start_date:
         query = query.filter(File.created_at >= search_params.start_date)

@@ -1,31 +1,48 @@
 import { useState, useEffect } from 'react';
-import { FiCheck, FiX, FiDollarSign, FiTrendingUp, FiClock, FiBell } from 'react-icons/fi';
+import { FiCheck, FiX, FiTrendingUp, FiClock, FiBell, FiRefreshCw } from 'react-icons/fi';
 import { fileService } from '../../api/fileService';
 
 export default function BuyerQuotes() {
   const [quotes, setQuotes] = useState([]);
+  const [allQuotes, setAllQuotes] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [filterStatus, setFilterStatus] = useState('sent');
+  const [refreshing, setRefreshing] = useState(false);
+  const [filterStatus, setFilterStatus] = useState('all');
   const [selectedQuote, setSelectedQuote] = useState(null);
   const [showDetails, setShowDetails] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
 
+  // Load all quotes for stats on component mount
+  useEffect(() => {
+    loadAllQuotesForStats();
+    loadNotifications();
+  }, []);
+
+  // Load filtered quotes when filter changes
   useEffect(() => {
     loadQuotes();
-    loadNotifications();
   }, [filterStatus]);
 
-  const loadQuotes = async () => {
-    setLoading(true);
+  const loadAllQuotesForStats = async () => {
     try {
-      const response = await fileService.getQuotes(filterStatus);
+      const response = await fileService.getBuyerQuotes('all');
+      setAllQuotes(response.quotes || []);
+    } catch (err) {
+      console.error('Error loading all quotes for stats:', err);
+    }
+  };
+
+  const loadQuotes = async () => {
+    setRefreshing(true);
+    try {
+      const response = await fileService.getBuyerQuotes(filterStatus);
       setQuotes(response.quotes || []);
     } catch (err) {
       console.error('Error loading quotes:', err);
     } finally {
-      setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -59,6 +76,7 @@ export default function BuyerQuotes() {
         await fileService.acceptQuote(quoteId);
         alert('Quote accepted! It has been added to your production queue.');
         setShowDetails(false);
+        loadAllQuotesForStats();
         loadQuotes();
         loadNotifications();
       } catch (err) {
@@ -78,6 +96,7 @@ export default function BuyerQuotes() {
         alert('Quote rejected');
         setRejectionReason('');
         setShowDetails(false);
+        loadAllQuotesForStats();
         loadQuotes();
         loadNotifications();
       } catch (err) {
@@ -100,10 +119,11 @@ export default function BuyerQuotes() {
   };
 
   const stats = {
-    total: quotes.length,
-    sent: quotes.filter(q => q.status === 'sent').length,
-    accepted: quotes.filter(q => q.status === 'accepted').length,
-    rejected: quotes.filter(q => q.status === 'rejected').length
+    total: allQuotes.length,
+    pending: allQuotes.filter(q => q.status === 'pending').length,
+    sent: allQuotes.filter(q => q.status === 'sent').length,
+    accepted: allQuotes.filter(q => q.status === 'accepted').length,
+    rejected: allQuotes.filter(q => q.status === 'rejected').length
   };
 
   const unreadNotifications = notifications.filter(n => !n.is_read).length;
@@ -117,18 +137,28 @@ export default function BuyerQuotes() {
             <h1 className="text-3xl font-bold text-slate-900 mb-2">Quotation Requests</h1>
             <p className="text-slate-600">Review quotes from manufacturers and make decisions</p>
           </div>
-          <button
-            onClick={() => setShowNotifications(!showNotifications)}
-            className="relative p-3 bg-white rounded-lg shadow hover:shadow-md transition border border-slate-200"
-            title="Quote Notifications"
-          >
-            <FiBell size={24} className="text-slate-600" />
-            {unreadNotifications > 0 && (
-              <span className="absolute top-1 right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                {unreadNotifications}
-              </span>
-            )}
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => loadQuotes()}
+              disabled={refreshing}
+              className="p-3 bg-white rounded-lg shadow hover:shadow-md transition border border-slate-200 disabled:opacity-50"
+              title="Refresh quotes"
+            >
+              <FiRefreshCw size={24} className={`text-slate-600 ${refreshing ? 'animate-spin' : ''}`} />
+            </button>
+            <button
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="relative p-3 bg-white rounded-lg shadow hover:shadow-md transition border border-slate-200"
+              title="Quote Notifications"
+            >
+              <FiBell size={24} className="text-slate-600" />
+              {unreadNotifications > 0 && (
+                <span className="absolute top-1 right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {unreadNotifications}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Notifications Dropdown */}
@@ -204,7 +234,7 @@ export default function BuyerQuotes() {
                 <p className="text-slate-600 text-sm">Total Quotes</p>
                 <p className="text-3xl font-bold text-slate-900">{stats.total}</p>
               </div>
-              <FiDollarSign className="text-3xl text-slate-400" />
+              <FiTrendingUp className="text-3xl text-slate-400" />
             </div>
           </div>
           <div className="bg-white rounded-lg shadow p-6">
@@ -238,7 +268,7 @@ export default function BuyerQuotes() {
 
         {/* Filter */}
         <div className="mb-6 flex gap-2">
-          {['sent', 'accepted', 'rejected'].map(status => (
+          {['all', 'accepted', 'rejected'].map(status => (
             <button
               key={status}
               onClick={() => setFilterStatus(status)}

@@ -12,6 +12,7 @@ from app.services.file_service import (
     get_file_by_id,
     delete_file,
 )
+from app.services.simple_mesh_service import generate_mesh_url
 
 router = APIRouter(prefix="/files", tags=["Files"])
 
@@ -27,12 +28,12 @@ def request_upload_url(
             filename=data.filename,
             content_type=data.content_type,
             db=db,
-            file_size=data.file_size,
-            uploaded_by=data.uploaded_by,
+            uploaded_by=current_user['username'],
             description=data.description,
             material=data.material,
             part_number=data.part_number,
             quantity_unit=data.quantity_unit,
+            thumbnail_data=data.thumbnail_data,
         )
         return {"upload_url": upload_url, "download_url": download_url, "file_id": file_id}
     except Exception as e:
@@ -43,11 +44,10 @@ def request_upload_url(
 def list_files_endpoint(
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
-    uploaded_by: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
-    files, total = list_files(db, limit=limit, offset=offset, uploaded_by=uploaded_by)
+    files, total = list_files(db, limit=limit, offset=offset)
     return {"total": total, "files": [FileResponse.from_orm(f) for f in files]}
 
 
@@ -84,6 +84,35 @@ def request_download_url(
         return {"download_url": download_url, "file": FileResponse.from_orm(file_record)}
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/mesh/{object_key:path}")
+def request_mesh_url(
+    object_key: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    try:
+        mesh_url, mesh_key = generate_mesh_url(object_key, db)
+        return {"mesh_url": mesh_url, "mesh_key": mesh_key}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except RuntimeError as e:
+        error_msg = str(e)
+        if "FreeCAD command not found" in error_msg:
+            raise HTTPException(
+                status_code=503,
+                detail="FreeCAD is not installed. Please install FreeCAD and configure FREECAD_CMD. See INSTALL_FREECAD.md for instructions."
+            )
+        elif "trimesh" in error_msg:
+            raise HTTPException(
+                status_code=503,
+                detail="Required Python package 'trimesh' is not installed. Run: pip install trimesh"
+            )
+        else:
+            raise HTTPException(status_code=500, detail=f"Mesh conversion failed: {error_msg}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
 
 @router.delete("/{object_key:path}")
