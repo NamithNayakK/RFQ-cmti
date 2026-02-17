@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FiPlus, FiX, FiCheck, FiFileText, FiEye, FiSend, FiTrash2, FiDownload, FiTrendingUp } from 'react-icons/fi';
+import { FiPlus, FiX, FiCheck, FiFileText, FiEye, FiSend, FiDownload, FiTrendingUp, FiRefreshCw } from 'react-icons/fi';
 import { fileService } from '../../api/fileService';
 
 export default function QuotationManagement({ filterStatus: initialFilter = 'all', onOpenCadViewer }) {
@@ -30,7 +30,8 @@ export default function QuotationManagement({ filterStatus: initialFilter = 'all
   const loadQuotationRequests = async () => {
     setLoading(true);
     try {
-      const response = await fileService.getNotifications(100, 0, filterStatus === 'pending');
+      const unreadOnly = filterStatus === 'pending' ? true : false;
+      const response = await fileService.getNotifications(100, 0, unreadOnly);
       const notifications = response.notifications || [];
       const requestsWithStatus = await Promise.all(
         notifications.map(async (notification) => {
@@ -46,6 +47,7 @@ export default function QuotationManagement({ filterStatus: initialFilter = 'all
                 ...notification,
                 quote_status: latestQuote.status,
                 quote_id: latestQuote.id,
+                quote_details: latestQuote,
               };
             }
           } catch (err) {
@@ -55,10 +57,15 @@ export default function QuotationManagement({ filterStatus: initialFilter = 'all
             ...notification,
             quote_status: null,
             quote_id: null,
+            quote_details: null,
           };
         })
       );
-      setRequests(requestsWithStatus);
+      let filtered = requestsWithStatus;
+      if (filterStatus === 'sent' || filterStatus === 'accepted' || filterStatus === 'rejected') {
+        filtered = requestsWithStatus.filter((r) => r.quote_status === filterStatus);
+      }
+      setRequests(filtered);
     } catch (err) {
       console.error('Error loading quotation requests:', err);
     } finally {
@@ -242,15 +249,27 @@ export default function QuotationManagement({ filterStatus: initialFilter = 'all
               <p className="text-slate-600 text-sm mt-1">Create and manage customer quotations</p>
             </div>
           </div>
+          <button
+            onClick={() => loadQuotationRequests()}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-medium disabled:opacity-60"
+            type="button"
+          >
+            <FiRefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+            Refresh
+          </button>
         </div>
       </div>
 
       {/* Filter Tabs */}
       <div className="bg-white border-b border-slate-200 px-8 py-4">
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           {[
-            { value: 'all', label: 'All Quotes', icon: '📁' },
-            { value: 'pending', label: 'Pending Requests', icon: '📋' },
+            { value: 'all', label: 'All', icon: '📁' },
+            { value: 'pending', label: 'Pending', icon: '📋' },
+            { value: 'sent', label: 'Quote Sent', icon: '📤' },
+            { value: 'accepted', label: 'Accepted', icon: '✓' },
+            { value: 'rejected', label: 'Rejected', icon: '✗' },
           ].map((tab) => (
             <button
               key={tab.value}
@@ -304,6 +323,9 @@ export default function QuotationManagement({ filterStatus: initialFilter = 'all
                         Material: {request.material || 'N/A'} &nbsp;•&nbsp; Quantity Unit: {request.quantity_unit || 'N/A'}
                       </p>
                     </div>
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(getStatusKey(request))}`}>
+                      {getStatusLabel(getStatusKey(request))}
+                    </span>
                   </div>
 
                   {/* Action Buttons */}
@@ -443,6 +465,47 @@ export default function QuotationManagement({ filterStatus: initialFilter = 'all
                   </div>
                 </div>
               </div>
+
+              {modalMode === 'view' && selectedRequest.quote_details && (
+                <div className="mb-8 space-y-6">
+                  <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                    <h3 className="text-sm font-semibold text-slate-700 uppercase mb-3">Quote Summary</h3>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-slate-600">Material Cost</span>
+                        <span className="font-semibold">₹{selectedRequest.quote_details.material_cost?.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-600">Labor Cost</span>
+                        <span className="font-semibold">₹{selectedRequest.quote_details.labor_cost?.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-600">Machine Time Cost</span>
+                        <span className="font-semibold">₹{selectedRequest.quote_details.machine_time_cost?.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between pt-2 border-t border-slate-200">
+                        <span className="font-bold text-slate-900">Total</span>
+                        <span className="text-lg font-bold text-manufacturing-accent">₹{selectedRequest.quote_details.total_price?.toFixed(2)}</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-3">
+                      Status: <span className={`font-semibold ${getStatusColor(selectedRequest.quote_details.status)}`}>{getStatusLabel(selectedRequest.quote_details.status)}</span>
+                      {selectedRequest.quote_details.accepted_at && (
+                        <> • Accepted {new Date(selectedRequest.quote_details.accepted_at).toLocaleDateString()}</>
+                      )}
+                      {selectedRequest.quote_details.rejected_at && selectedRequest.quote_details.rejection_reason && (
+                        <> • {selectedRequest.quote_details.rejection_reason}</>
+                      )}
+                    </p>
+                  </div>
+                  {selectedRequest.quote_details.notes && (
+                    <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                      <h3 className="text-sm font-semibold text-slate-700 uppercase mb-2">Notes</h3>
+                      <p className="text-sm text-slate-700">{selectedRequest.quote_details.notes}</p>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {modalMode === 'create' && (
                 <>

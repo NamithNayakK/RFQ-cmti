@@ -69,7 +69,8 @@ export default function FileUpload({ onUploadSuccess }) {
         throw new Error('STEP parser not available');
       }
 
-      const result = isIges ? readIges(buffer) : readStep(buffer);
+      const importParams = { linearUnit: 'millimeter' };
+      const result = isIges ? readIges(buffer, importParams) : readStep(buffer, importParams);
       const meshes = result?.meshes || [];
 
       if (!meshes.length) {

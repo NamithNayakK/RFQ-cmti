@@ -34,12 +34,21 @@ export default function CostManagement() {
   const loadCosts = async () => {
     setLoading(true);
     try {
-      const response = await fileService.getLiveMaterialCosts();
-      setCosts(response.items || []);
-      setLastUpdated(response.updated_at || null);
-      setPriceSource(response.source || '');
+      const response = await fileService.getMaterialPrices(100, 0);
+      const items = Array.isArray(response) ? response : response.materials || [];
+      setCosts(items.map((m) => ({
+        id: m.id,
+        material: m.material_name,
+        costPerKg: m.base_price_per_unit,
+        laborCostPerHour: m.labor_cost_per_hour,
+        machineCostPerHour: m.labor_cost_per_hour,
+        minimumOrder: m.minimum_order_quantity,
+      })));
+      setLastUpdated(null);
+      setPriceSource('Your pricing database');
     } catch (err) {
       console.error('Error loading costs:', err);
+      setCosts([]);
     } finally {
       setLoading(false);
     }
@@ -53,40 +62,35 @@ export default function CostManagement() {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (editingId) {
-      // Update existing
-      const updated = costs.map(cost =>
-        cost.id === editingId
-          ? {
-              ...cost,
-              material: formData.material,
-              costPerKg: parseFloat(formData.cost),
-              laborCostPerHour: parseFloat(formData.laborHour),
-              machineCostPerHour: parseFloat(formData.machineHour),
-              minimumOrder: parseInt(formData.minOrder)
-            }
-          : cost
-      );
-      setCosts(updated);
-      setEditingId(null);
-    } else {
-      // Add new
-      const newCost = {
-        id: Math.max(...costs.map(c => c.id), 0) + 1,
-        material: formData.material,
-        costPerKg: parseFloat(formData.cost),
-        laborCostPerHour: parseFloat(formData.laborHour),
-        machineCostPerHour: parseFloat(formData.machineHour),
-        minimumOrder: parseInt(formData.minOrder)
-      };
-      setCosts([...costs, newCost]);
+    try {
+      if (editingId) {
+        const cost = costs.find((c) => c.id === editingId);
+        if (cost) {
+          await fileService.updateMaterialPrice(cost.material, {
+            base_price_per_unit: parseFloat(formData.cost),
+            labor_cost_per_hour: parseFloat(formData.laborHour),
+            minimum_order_quantity: parseInt(formData.minOrder, 10),
+          });
+        }
+        setEditingId(null);
+      } else {
+        await fileService.createMaterialPrice({
+          material_name: formData.material,
+          base_price_per_unit: parseFloat(formData.cost),
+          labor_cost_per_hour: parseFloat(formData.laborHour),
+          minimum_order_quantity: parseInt(formData.minOrder, 10) || 1,
+        });
+      }
+      setFormData({ material: '', cost: '', laborHour: '', machineHour: '', minOrder: '' });
+      setShowModal(false);
+      await loadCosts();
+    } catch (err) {
+      console.error('Error saving cost:', err);
+      alert('Failed to save: ' + (err.response?.data?.detail || err.message));
     }
-
-    setFormData({ material: '', cost: '', laborHour: '', machineHour: '', minOrder: '' });
-    setShowModal(false);
   };
 
   const handleEdit = (cost) => {
@@ -101,9 +105,15 @@ export default function CostManagement() {
     setShowModal(true);
   };
 
-  const handleDelete = (id) => {
-    if (window.confirm('Delete this cost entry?')) {
-      setCosts(costs.filter(cost => cost.id !== id));
+  const handleDelete = async (id) => {
+    const cost = costs.find((c) => c.id === id);
+    if (!cost || !window.confirm(`Delete pricing for ${cost.material}?`)) return;
+    try {
+      await fileService.deleteMaterialPrice(cost.material);
+      await loadCosts();
+    } catch (err) {
+      console.error('Error deleting cost:', err);
+      alert('Failed to delete: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -113,7 +123,7 @@ export default function CostManagement() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-semibold text-slate-900">Cost Management</h2>
-          <p className="text-slate-500 mt-1">Live material pricing in INR (auto-updated daily)</p>
+          <p className="text-slate-500 mt-1">Manage material pricing used for quote calculations</p>
           {lastUpdated && (
             <p className="text-xs text-slate-400 mt-1">
               Last updated: {new Date(lastUpdated).toLocaleString()} {priceSource ? `• Source: ${priceSource}` : ''}
@@ -125,10 +135,10 @@ export default function CostManagement() {
             onClick={loadCosts}
             disabled={loading}
             className="bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-white font-semibold py-2.5 px-4 rounded-lg transition flex items-center gap-2"
-            title="Refresh prices"
+            title="Refresh"
           >
             <FiZap />
-            {loading ? 'Refreshing...' : 'Refresh Prices'}
+            {loading ? 'Refreshing...' : 'Refresh'}
           </button>
           <button
             onClick={() => {
@@ -152,8 +162,8 @@ export default function CostManagement() {
           </div>
         ) : costs.length === 0 ? (
           <div className="text-center py-16 bg-slate-50 rounded-xl">
-            <p className="text-slate-700 font-medium">No cost entries yet</p>
-            <p className="text-sm text-slate-500">Add your first material cost</p>
+            <p className="text-slate-700 font-medium">No material prices yet</p>
+            <p className="text-sm text-slate-500 mt-1">Add materials to enable auto-pricing when creating quotes</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -251,7 +261,8 @@ export default function CostManagement() {
                   value={formData.material}
                   onChange={handleInputChange}
                   required
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-manufacturing-primary focus:border-transparent"
+                  readOnly={!!editingId}
+                  className={`w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-manufacturing-primary focus:border-transparent ${editingId ? 'bg-slate-100' : ''}`}
                 />
               </div>
 

@@ -9,6 +9,7 @@ export default function ManufacturerDashboard({ onRefresh, onNavigate }) {
   const [rejectedQuotesCount, setRejectedQuotesCount] = useState(0);
   const [rejectedQuotes, setRejectedQuotes] = useState([]);
   const [showRejectedModal, setShowRejectedModal] = useState(false);
+  const [quotesSentCount, setQuotesSentCount] = useState(0);
 
   const parseQuantityValue = (quantityUnit) => {
     if (typeof quantityUnit === 'number') {
@@ -51,6 +52,9 @@ export default function ManufacturerDashboard({ onRefresh, onNavigate }) {
           quotedPrice: quote.total_price
         }));
         setProduction(productionItems);
+
+        const statsRes = await fileService.getManufacturerStats().catch(() => ({}));
+        if (statsRes.sent_quotes !== undefined) setQuotesSentCount(statsRes.sent_quotes);
       } catch (err) {
         console.error('Error loading production data:', err);
         setProduction([]);
@@ -65,18 +69,17 @@ export default function ManufacturerDashboard({ onRefresh, onNavigate }) {
 
   const stats = useMemo(() => {
     const pendingRequests = notifications.filter(n => !n.is_read).length;
-    const quotesSent = notifications.filter(n => n.is_read).length;
     const pendingOrders = production.filter(p => p.status === 'Pending').length;
     const totalItems = production.reduce((sum, p) => sum + parseQuantityValue(p.quantity), 0);
     
     return {
       pendingRequests,
-      quotesSent,
+      quotesSent: quotesSentCount,
       pendingOrders,
       totalItems,
       rejectedQuotes: rejectedQuotesCount
     };
-  }, [production, notifications, rejectedQuotesCount, rejectedQuotes]);
+  }, [production, notifications, rejectedQuotesCount, quotesSentCount]);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -152,7 +155,11 @@ export default function ManufacturerDashboard({ onRefresh, onNavigate }) {
       <div className="bg-white rounded-2xl border border-slate-200 p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-slate-900">Active Production Queue</h3>
-          <button className="text-sm text-manufacturing-accent hover:text-manufacturing-accent/80 font-medium">
+          <button
+            onClick={() => onNavigate('Production Queue')}
+            className="text-sm text-manufacturing-accent hover:text-manufacturing-accent/80 font-medium"
+            type="button"
+          >
             View All →
           </button>
         </div>

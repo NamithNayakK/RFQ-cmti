@@ -80,13 +80,10 @@ export default function CadViewerPage({ request, onBack }) {
         }
 
         setLoadingStatus('Parsing CAD file...');
-        const result = isIges ? readIges(fileBuffer) : readStep(fileBuffer);
+        // Explicit linearUnit ensures accurate mm output regardless of file's native units (inches, meters, etc.)
+        const importParams = { linearUnit: 'millimeter' };
+        const result = isIges ? readIges(fileBuffer, importParams) : readStep(fileBuffer, importParams);
         const meshes = result?.meshes || [];
-        
-        // Get unit scale from result (OpenCascade.js provides this)
-        // 1 = meters, 1000 = millimeters, etc.
-        const unitScale = result?.unit || 1000; // Default to millimeters if not provided
-        console.log('CAD file unit scale:', unitScale);
 
         if (!meshes.length) {
           throw new Error('No mesh data found in file. Please ensure the file is a valid STEP or IGES CAD file.');
@@ -182,10 +179,7 @@ export default function CadViewerPage({ request, onBack }) {
         const sizeAfter = new THREE.Vector3();
         bboxAfter.getSize(sizeAfter);
 
-        // Volume approximation from bounding box
-        const totalVolume = sizeAfter.x * sizeAfter.y * sizeAfter.z;
-
-        // Set basic measurements immediately (defer surface area calculation)
+        // Set basic measurements immediately (volume/surface area calculated in deferred block)
         setMeasurements({
           dimensions: {
             length: sizeAfter.x,
@@ -193,7 +187,7 @@ export default function CadViewerPage({ request, onBack }) {
             height: sizeAfter.z,
             maxDimension: Math.max(sizeAfter.x, sizeAfter.y, sizeAfter.z)
           },
-          volume: totalVolume,
+          volume: null, // Will be computed from mesh (more accurate than bounding box)
           surfaceArea: null, // Will be calculated after render
           unit: 'mm' // Measurements are in millimeters
         });
@@ -427,22 +421,23 @@ export default function CadViewerPage({ request, onBack }) {
           }
         }, 100);
 
-        // Defer surface area calculation to prevent blocking
+        // Defer volume and surface area calculation to prevent blocking
         setTimeout(() => {
           let totalSurfaceArea = 0;
+          let totalVolume = 0;
           
-          // Reuse Vector3 objects to reduce garbage collection
           const a = new THREE.Vector3();
           const b = new THREE.Vector3();
           const c = new THREE.Vector3();
           const ab = new THREE.Vector3();
           const ac = new THREE.Vector3();
+          const cross = new THREE.Vector3();
           
           group.traverse((child) => {
             if (child.isMesh && child.geometry) {
               const geometry = child.geometry;
               
-              if (geometry.index) {
+              if (geometry.index && geometry.getAttribute('position')) {
                 const posAttr = geometry.getAttribute('position');
                 const indices = geometry.index.array;
                 
@@ -451,18 +446,26 @@ export default function CadViewerPage({ request, onBack }) {
                   b.fromBufferAttribute(posAttr, indices[i + 1]);
                   c.fromBufferAttribute(posAttr, indices[i + 2]);
                   
+                  // Surface area: 0.5 * |cross(b-a, c-a)|
                   ab.subVectors(b, a);
                   ac.subVectors(c, a);
-                  ab.cross(ac);
-                  totalSurfaceArea += ab.length() * 0.5;
+                  cross.crossVectors(ab, ac);
+                  totalSurfaceArea += cross.length() * 0.5;
+                  
+                  // Signed tetrahedron volume: (1/6) * dot(a, cross(b,c))
+                  cross.crossVectors(b, c);
+                  totalVolume += a.dot(cross) / 6;
                 }
               }
             }
           });
           
-          // Update measurements with calculated surface area
+          // Volume is the absolute value (handles inconsistent triangle winding)
+          totalVolume = Math.abs(totalVolume);
+          
           setMeasurements(prev => ({
             ...prev,
+            volume: totalVolume,
             surfaceArea: totalSurfaceArea
           }));
         }, 200);
@@ -811,7 +814,9 @@ export default function CadViewerPage({ request, onBack }) {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-600">Volume</span>
-                    <span className="font-medium text-slate-900">{(measurements.volume / 1000).toFixed(2)} cm3</span>
+                    <span className="font-medium text-slate-900">
+                      {measurements.volume != null ? `${(measurements.volume / 1000).toFixed(2)} cm3` : 'Calculating...'}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-600">Surface Area</span>
@@ -822,7 +827,7 @@ export default function CadViewerPage({ request, onBack }) {
                     </span>
                   </div>
                   <div className="text-xs text-slate-500 pt-3 border-t border-slate-200">
-                    Note: Surface area is estimated based on mesh data.
+                    Note: Volume and surface area are computed from mesh geometry. Dimensions are from bounding box.
                   </div>
                 </div>
               ) : (

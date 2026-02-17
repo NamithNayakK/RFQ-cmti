@@ -76,7 +76,9 @@ export default function CadViewerModal({ isOpen, onClose, request }) {
           throw new Error('STEP parser not available');
         }
 
-        const result = isIges ? readIges(fileBuffer) : readStep(fileBuffer);
+        // Explicit linearUnit ensures accurate mm output regardless of file's native units
+        const importParams = { linearUnit: 'millimeter' };
+        const result = isIges ? readIges(fileBuffer, importParams) : readStep(fileBuffer, importParams);
         const meshes = result?.meshes || [];
 
         if (!meshes.length) {
@@ -140,8 +142,16 @@ export default function CadViewerModal({ isOpen, onClose, request }) {
         const center = box.getCenter(new THREE.Vector3());
         const maxDim = Math.max(size.x, size.y, size.z) || 1;
 
-        // Calculate surface area from mesh faces
+        // Calculate surface area and actual mesh volume from mesh faces
         let totalSurfaceArea = 0;
+        let totalVolume = 0;
+        const v1 = new THREE.Vector3();
+        const v2 = new THREE.Vector3();
+        const v3 = new THREE.Vector3();
+        const edge1 = new THREE.Vector3();
+        const edge2 = new THREE.Vector3();
+        const cross = new THREE.Vector3();
+
         group.traverse((child) => {
           if (child.isMesh && child.geometry) {
             const geo = child.geometry;
@@ -149,17 +159,21 @@ export default function CadViewerModal({ isOpen, onClose, request }) {
             if (positions && geo.index) {
               const indices = geo.index.array;
               for (let i = 0; i < indices.length; i += 3) {
-                const v1 = new THREE.Vector3().fromBufferAttribute(positions, indices[i]);
-                const v2 = new THREE.Vector3().fromBufferAttribute(positions, indices[i + 1]);
-                const v3 = new THREE.Vector3().fromBufferAttribute(positions, indices[i + 2]);
-                const edge1 = new THREE.Vector3().subVectors(v2, v1);
-                const edge2 = new THREE.Vector3().subVectors(v3, v1);
-                const cross = new THREE.Vector3().crossVectors(edge1, edge2);
+                v1.fromBufferAttribute(positions, indices[i]);
+                v2.fromBufferAttribute(positions, indices[i + 1]);
+                v3.fromBufferAttribute(positions, indices[i + 2]);
+                edge1.subVectors(v2, v1);
+                edge2.subVectors(v3, v1);
+                cross.crossVectors(edge1, edge2);
                 totalSurfaceArea += cross.length() * 0.5;
+                // Signed tetrahedron volume: (1/6) * dot(v1, cross(v2, v3))
+                cross.crossVectors(v2, v3);
+                totalVolume += v1.dot(cross) / 6;
               }
             }
           }
         });
+        totalVolume = Math.abs(totalVolume);
 
         // Detect holes by analyzing edge connectivity (simplified)
         let estimatedHolesCount = 0;
@@ -177,7 +191,7 @@ export default function CadViewerModal({ isOpen, onClose, request }) {
           }
         });
 
-        // Extract measurements from bounding box
+        // Extract measurements: dimensions from bounding box, volume/surface from mesh
         const extractedMeasurements = {
           boundingBox: {
             min: { x: box.min.x, y: box.min.y, z: box.min.z },
@@ -190,7 +204,7 @@ export default function CadViewerModal({ isOpen, onClose, request }) {
             height: size.z,
             maxDimension: maxDim
           },
-          volume: size.x * size.y * size.z,
+          volume: totalVolume,
           surfaceArea: totalSurfaceArea,
           holeCount: Math.max(0, estimatedHolesCount)
         };
@@ -417,7 +431,7 @@ export default function CadViewerModal({ isOpen, onClose, request }) {
                 </div>
               </div>
               <div className="text-xs text-slate-500 mt-4 p-2 bg-white rounded border border-slate-200">
-                ℹ️ Measurements extracted from 3D model geometry. Surface area and hole count are estimates based on mesh topology analysis.
+                ℹ️ Dimensions from bounding box (mm). Volume and surface area computed from mesh geometry. Hole count is estimated from mesh topology.
               </div>
             </div>
           )}

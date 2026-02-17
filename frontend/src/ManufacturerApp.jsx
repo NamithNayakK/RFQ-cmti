@@ -165,14 +165,7 @@ function ManufacturerApp({ onLogout }) {
               <h1 className="text-2xl font-semibold text-slate-900">{activeNav}</h1>
               <p className="text-sm text-slate-500">Manage your manufacturing operations</p>
             </div>
-            <div className="flex items-center gap-6">
-              <button
-                onClick={() => setIsSidebarCollapsed((prev) => !prev)}
-                className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50"
-                type="button"
-              >
-                {isSidebarCollapsed ? 'Expand' : 'Collapse'}
-              </button>
+            <div className="flex items-center gap-4">
               <button 
                 onClick={() => setShowNotifications(!showNotifications)}
                 className="relative p-2 text-slate-600 hover:text-slate-900"

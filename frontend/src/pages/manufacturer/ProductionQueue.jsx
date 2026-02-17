@@ -1,6 +1,8 @@
 import { useEffect, useState, useMemo } from 'react';
-import { FiEdit2, FiTrash2, FiCheck, FiClock, FiSearch, FiFilter, FiArrowUp, FiArrowDown } from 'react-icons/fi';
+import { FiEdit2, FiCheck, FiSearch, FiArrowUp, FiArrowDown } from 'react-icons/fi';
 import { fileService } from '../../api/fileService';
+
+const STORAGE_KEY = 'manufacturer_production_queue_state';
 
 export default function ProductionQueue({ refreshTrigger }) {
   const [queue, setQueue] = useState([]);
@@ -24,28 +26,33 @@ export default function ProductionQueue({ refreshTrigger }) {
   const loadQueue = async () => {
     setLoading(true);
     try {
-      // Load accepted quotes from backend
       const response = await fileService.getQuotes('accepted', 100);
       const acceptedQuotes = response.quotes || [];
+      let savedState = {};
+      try {
+        savedState = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+      } catch (_) {}
 
-      // Transform quotes into production queue items
-      const queueItems = acceptedQuotes.map((quote, index) => ({
-        id: quote.id,
-        partName: quote.part_name,
-        partNumber: quote.part_number || 'N/A',
-        material: quote.material,
-        quantity: quote.quantity_unit,
-        status: 'Pending',
-        progress: 0,
-        startDate: null,
-        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        assignedMachine: 'Unassigned',
-        assignedOperator: 'Unassigned',
-        estimatedHours: 0,
-        quotedPrice: quote.total_price,
-        priority: 'Medium',
-        quoteId: quote.id
-      }));
+      const queueItems = acceptedQuotes.map((quote) => {
+        const saved = savedState[quote.id] || {};
+        return {
+          id: quote.id,
+          partName: quote.part_name,
+          partNumber: quote.part_number || 'N/A',
+          material: quote.material,
+          quantity: quote.quantity_unit,
+          status: saved.status ?? 'Pending',
+          progress: saved.progress ?? 0,
+          startDate: saved.startDate ?? null,
+          dueDate: saved.dueDate ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          assignedMachine: saved.assignedMachine ?? 'Unassigned',
+          assignedOperator: saved.assignedOperator ?? 'Unassigned',
+          estimatedHours: saved.estimatedHours ?? 0,
+          quotedPrice: quote.total_price,
+          priority: saved.priority ?? 'Medium',
+          quoteId: quote.id,
+        };
+      });
 
       setQueue(queueItems);
     } catch (err) {
@@ -57,25 +64,39 @@ export default function ProductionQueue({ refreshTrigger }) {
     }
   };
 
+  const persistQueueState = (updatedQueue) => {
+    const state = {};
+    updatedQueue.forEach((item) => {
+      state[item.id] = {
+        status: item.status,
+        progress: item.progress,
+        dueDate: item.dueDate,
+        assignedMachine: item.assignedMachine,
+        assignedOperator: item.assignedOperator,
+        priority: item.priority,
+      };
+    });
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (_) {}
+  };
+
   const updateStatus = (id, newStatus) => {
-    const updated = queue.map(item =>
-      item.id === id ? { ...item, status: newStatus } : item
-    );
+    const updated = queue.map(item => (item.id === id ? { ...item, status: newStatus } : item));
     setQueue(updated);
+    persistQueueState(updated);
   };
 
   const updatePriority = (id, newPriority) => {
-    const updated = queue.map(item =>
-      item.id === id ? { ...item, priority: newPriority } : item
-    );
+    const updated = queue.map(item => (item.id === id ? { ...item, priority: newPriority } : item));
     setQueue(updated);
+    persistQueueState(updated);
   };
 
   const updateAssignment = (id, field, value) => {
-    const updated = queue.map(item =>
-      item.id === id ? { ...item, [field]: value } : item
-    );
+    const updated = queue.map(item => (item.id === id ? { ...item, [field]: value } : item));
     setQueue(updated);
+    persistQueueState(updated);
   };
 
   const completeOrder = (id) => {
@@ -161,7 +182,7 @@ export default function ProductionQueue({ refreshTrigger }) {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold text-slate-900">Production Queue</h2>
-          <p className="text-sm text-slate-500">{filteredQueue.length} of {queue.length} items</p>
+          <p className="text-sm text-slate-500">{filteredQueue.length} of {queue.length} items • Status changes saved locally</p>
         </div>
       </div>
 
