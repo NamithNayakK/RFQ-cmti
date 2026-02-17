@@ -86,18 +86,6 @@ export const fileService = {
     return response.data;
   },
 
-  // Health check
-  healthCheck: async () => {
-    const response = await api.get('/');
-    return response.data;
-  },
-
-  // Database check
-  dbCheck: async () => {
-    const response = await api.get('/db-check');
-    return response.data;
-  },
-
   // Live material pricing (INR)
   getLiveMaterialCosts: async (materials = []) => {
     const params = materials.length > 0 ? { materials: materials.join(',') } : undefined;

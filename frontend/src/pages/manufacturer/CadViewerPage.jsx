@@ -6,9 +6,11 @@ import AutoCADViewCube from '../../components/AutoCADViewCube';
 export default function CadViewerPage({ request, onBack }) {
   const containerRef = useRef(null);
   const [loading, setLoading] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState('');
   const [error, setError] = useState('');
   const [measurements, setMeasurements] = useState(null);
   const [displayMode, setDisplayMode] = useState('shaded-visible-edges');
+  const [colorMode, setColorMode] = useState(true); // true = colored by orientation, false = single color
   const sceneRef = useRef(null);
   const [activeView, setActiveView] = useState('iso');
   const animationRef = useRef({ isAnimating: false, startTime: 0, duration: 500 });
@@ -24,10 +26,12 @@ export default function CadViewerPage({ request, onBack }) {
 
     const loadViewer = async () => {
       setLoading(true);
+      setLoadingStatus('Preparing viewer...');
       setError('');
       setMeasurements(null);
 
       try {
+        setLoadingStatus('Downloading file...');
         const response = await fileService.requestDownloadUrl(request.object_key);
         const downloadUrl = response.download_url;
 
@@ -41,6 +45,7 @@ export default function CadViewerPage({ request, onBack }) {
         }
 
         const fileBuffer = new Uint8Array(await fileResponse.arrayBuffer());
+        setLoadingStatus('Loading 3D engine...');
 
         const [occtModule, threeModule, controlsModule] = await Promise.all([
           import('occt-import-js'),
@@ -74,12 +79,20 @@ export default function CadViewerPage({ request, onBack }) {
           throw new Error('STEP parser not available');
         }
 
+        setLoadingStatus('Parsing CAD file...');
         const result = isIges ? readIges(fileBuffer) : readStep(fileBuffer);
         const meshes = result?.meshes || [];
+        
+        // Get unit scale from result (OpenCascade.js provides this)
+        // 1 = meters, 1000 = millimeters, etc.
+        const unitScale = result?.unit || 1000; // Default to millimeters if not provided
+        console.log('CAD file unit scale:', unitScale);
 
         if (!meshes.length) {
           throw new Error('No mesh data found in file. Please ensure the file is a valid STEP or IGES CAD file.');
         }
+        
+        setLoadingStatus(`Processing ${meshes.length} mesh${meshes.length > 1 ? 'es' : ''}...`);
 
         const container = containerRef.current;
         if (!container) {
@@ -88,6 +101,12 @@ export default function CadViewerPage({ request, onBack }) {
 
         const scene = new THREE.Scene();
         scene.background = new THREE.Color('#ffffff');
+
+        // Add grid helper (AutoCAD-style)
+        const gridSize = 200;
+        const gridDivisions = 20;
+        const gridHelper = new THREE.GridHelper(gridSize, gridDivisions, 0x444444, 0xcccccc);
+        scene.add(gridHelper);
 
         const group = new THREE.Group();
 
@@ -121,13 +140,17 @@ export default function CadViewerPage({ request, onBack }) {
             geometry.setIndex(new THREE.BufferAttribute(indexArray, 1));
           }
 
-          geometry.computeBoundingBox();
           if (!normals) {
             geometry.computeVertexNormals();
           }
+          geometry.computeBoundingBox();
+
+          // Store normal attribute reference for later vertex color computation
+          // Only compute colors when needed to improve loading performance
 
           const material = new THREE.MeshStandardMaterial({
             color: 0xbfc7d4,
+            vertexColors: false, // Will be computed after first render
             metalness: 0.1,
             roughness: 0.6,
             side: THREE.DoubleSide,
@@ -135,8 +158,11 @@ export default function CadViewerPage({ request, onBack }) {
           });
 
           const meshObj = new THREE.Mesh(geometry, material);
+          meshObj.userData.hasVertexColors = false; // Will be set to true after colors computed
           group.add(meshObj);
         });
+        
+        setLoadingStatus('Building 3D scene...');
 
         scene.add(group);
 
@@ -149,21 +175,31 @@ export default function CadViewerPage({ request, onBack }) {
 
         const normalizedCenter = center.clone();
         group.position.sub(center);
+        
+        // Recalculate bbox after repositioning
+        group.updateMatrixWorld(true);
+        const bboxAfter = new THREE.Box3().setFromObject(group);
+        const sizeAfter = new THREE.Vector3();
+        bboxAfter.getSize(sizeAfter);
 
-        const maxDim = Math.max(size.x, size.y, size.z);
-        const cameraOffset = maxDim * 2.5;
+        // Volume approximation from bounding box
+        const totalVolume = sizeAfter.x * sizeAfter.y * sizeAfter.z;
 
+        // Set basic measurements immediately (defer surface area calculation)
         setMeasurements({
           dimensions: {
-            length: size.x,
-            width: size.y,
-            height: size.z,
-            maxDimension: maxDim
+            length: sizeAfter.x,
+            width: sizeAfter.y,
+            height: sizeAfter.z,
+            maxDimension: Math.max(sizeAfter.x, sizeAfter.y, sizeAfter.z)
           },
-          volume: size.x * size.y * size.z,
-          surfaceArea: 2 * (size.x * size.y + size.y * size.z + size.z * size.x),
-          holeCount: Math.floor(Math.random() * 10)
+          volume: totalVolume,
+          surfaceArea: null, // Will be calculated after render
+          unit: 'mm' // Measurements are in millimeters
         });
+
+        const maxDim = Math.max(sizeAfter.x, sizeAfter.y, sizeAfter.z);
+        const cameraOffset = maxDim * 2.5;
 
         const camera = new THREE.PerspectiveCamera(
           50,
@@ -255,7 +291,7 @@ export default function CadViewerPage({ request, onBack }) {
           }
         });
 
-        applyDisplayMode(group, displayMode, THREE);
+        applyDisplayMode(group, displayMode, THREE, colorMode);
 
         // Setup OrbitControls
         const controls = new OrbitControls(camera, renderer.domElement);
@@ -326,8 +362,7 @@ export default function CadViewerPage({ request, onBack }) {
               camera.up.copy(animationRef.current.targetUp);
               camera.lookAt(animationRef.current.targetCenter);
               controls.target.copy(animationRef.current.targetCenter);
-
-              controls.enabled = true;
+              controls.update();
               animationRef.current.isAnimating = false;
             }
           }
@@ -351,12 +386,92 @@ export default function CadViewerPage({ request, onBack }) {
         window.addEventListener('resize', handleResize);
 
         setLoading(false);
+        setLoadingStatus('');
         setError('');
+
+        // Defer heavy calculations to after initial render
+        setTimeout(() => {
+          // Compute vertex colors for orientation-based coloring
+          group.traverse((child) => {
+            if (child.isMesh && child.geometry) {
+              const geometry = child.geometry;
+              const normalAttr = geometry.getAttribute('normal');
+              
+              if (normalAttr && !geometry.getAttribute('color')) {
+                const colors = new Float32Array(normalAttr.count * 3);
+                
+                for (let i = 0; i < normalAttr.count; i++) {
+                  const nx = Math.abs(normalAttr.getX(i));
+                  const ny = Math.abs(normalAttr.getY(i));
+                  const nz = Math.abs(normalAttr.getZ(i));
+                  
+                  colors[i * 3] = nx;
+                  colors[i * 3 + 1] = ny;
+                  colors[i * 3 + 2] = nz;
+                }
+                
+                geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+                child.userData.hasVertexColors = true;
+              }
+            }
+          });
+          
+          // Apply vertex colors if color mode is enabled
+          if (colorMode) {
+            group.traverse((child) => {
+              if (child.isMesh && child.material && child.userData.hasVertexColors) {
+                child.material.vertexColors = true;
+                child.material.needsUpdate = true;
+              }
+            });
+          }
+        }, 100);
+
+        // Defer surface area calculation to prevent blocking
+        setTimeout(() => {
+          let totalSurfaceArea = 0;
+          
+          // Reuse Vector3 objects to reduce garbage collection
+          const a = new THREE.Vector3();
+          const b = new THREE.Vector3();
+          const c = new THREE.Vector3();
+          const ab = new THREE.Vector3();
+          const ac = new THREE.Vector3();
+          
+          group.traverse((child) => {
+            if (child.isMesh && child.geometry) {
+              const geometry = child.geometry;
+              
+              if (geometry.index) {
+                const posAttr = geometry.getAttribute('position');
+                const indices = geometry.index.array;
+                
+                for (let i = 0; i < indices.length; i += 3) {
+                  a.fromBufferAttribute(posAttr, indices[i]);
+                  b.fromBufferAttribute(posAttr, indices[i + 1]);
+                  c.fromBufferAttribute(posAttr, indices[i + 2]);
+                  
+                  ab.subVectors(b, a);
+                  ac.subVectors(c, a);
+                  ab.cross(ac);
+                  totalSurfaceArea += ab.length() * 0.5;
+                }
+              }
+            }
+          });
+          
+          // Update measurements with calculated surface area
+          setMeasurements(prev => ({
+            ...prev,
+            surfaceArea: totalSurfaceArea
+          }));
+        }, 200);
 
       } catch (err) {
         console.error('Error loading 3D viewer:', err);
         setError(err.message || 'Failed to load 3D viewer');
         setLoading(false);
+        setLoadingStatus('');
       }
     };
 
@@ -464,11 +579,10 @@ export default function CadViewerPage({ request, onBack }) {
       targetCenter: normalizedCenter.clone()
     };
 
-    controls.enabled = false;
     setActiveView(viewName);
   };
 
-  const applyDisplayMode = (group, mode, THREE) => {
+  const applyDisplayMode = (group, mode, THREE, useVertexColors) => {
     if (!group) return;
 
     group.traverse((child) => {
@@ -483,6 +597,7 @@ export default function CadViewerPage({ request, onBack }) {
             if (originalMaterial) {
               const mat = originalMaterial.clone();
               mat.color.setHex(0xbfc7d4);
+              mat.vertexColors = child.userData.hasVertexColors && useVertexColors;
               mat.metalness = 0.1;
               mat.roughness = 0.6;
               child.material = mat;
@@ -496,6 +611,7 @@ export default function CadViewerPage({ request, onBack }) {
             if (originalMaterial) {
               const mat = originalMaterial.clone();
               mat.color.setHex(0xbfc7d4);
+              mat.vertexColors = child.userData.hasVertexColors && useVertexColors;
               mat.metalness = 0.1;
               mat.roughness = 0.6;
               child.material = mat;
@@ -583,26 +699,41 @@ export default function CadViewerPage({ request, onBack }) {
 
   useEffect(() => {
     if (sceneRef.current?.group && sceneRef.current?.THREE) {
-      applyDisplayMode(sceneRef.current.group, displayMode, sceneRef.current.THREE);
+      applyDisplayMode(sceneRef.current.group, displayMode, sceneRef.current.THREE, colorMode);
     }
-  }, [displayMode]);
+  }, [displayMode, colorMode]);
 
   return (
     <div className="flex flex-col h-full gap-4 px-4 pb-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-slate-700">Display:</label>
-          <select
-            value={displayMode}
-            onChange={(e) => setDisplayMode(e.target.value)}
-            className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-slate-700">Display:</label>
+            <select
+              value={displayMode}
+              onChange={(e) => setDisplayMode(e.target.value)}
+              className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="shaded-hidden-edges">Shaded</option>
+              <option value="shaded-visible-edges">Shaded with Visible Edges</option>
+              <option value="wireframe">Wireframe</option>
+              <option value="wireframe-hidden-edges">Wireframe with Hidden Edges</option>
+              <option value="wireframe-visible-edges">Wireframe (Visible Edges Only)</option>
+            </select>
+          </div>
+          
+          <button
+            onClick={() => setColorMode(!colorMode)}
+            className={`px-3 py-2 text-sm rounded-lg border transition-colors ${
+              colorMode 
+                ? 'bg-blue-500 text-white border-blue-500 hover:bg-blue-600' 
+                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+            }`}
+            type="button"
+            title={colorMode ? 'Switch to single color' : 'Switch to orientation colors'}
           >
-            <option value="shaded-hidden-edges">Shaded</option>
-            <option value="shaded-visible-edges">Shaded with Visible Edges</option>
-            <option value="wireframe">Wireframe</option>
-            <option value="wireframe-hidden-edges">Wireframe with Hidden Edges</option>
-            <option value="wireframe-visible-edges">Wireframe (Visible Edges Only)</option>
-          </select>
+            {colorMode ? '🎨 Colored' : '⚪ Single Color'}
+          </button>
         </div>
 
         <button
@@ -624,8 +755,9 @@ export default function CadViewerPage({ request, onBack }) {
           <div className="flex-1 lg:basis-[70%]">
             <div className="relative w-full h-[520px] lg:h-full bg-white rounded-xl overflow-hidden border border-slate-200 shadow-sm touchAction-none">
               {loading && (
-                <div className="absolute inset-0 flex items-center justify-center bg-white">
-                  <p className="text-slate-500">Loading 3D viewer...</p>
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-white gap-3">
+                  <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                  <p className="text-slate-600 font-medium">{loadingStatus || 'Loading 3D viewer...'}</p>
                 </div>
               )}
               {error && !loading && (
@@ -683,14 +815,14 @@ export default function CadViewerPage({ request, onBack }) {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-600">Surface Area</span>
-                    <span className="font-medium text-slate-900">{(measurements.surfaceArea / 100).toFixed(2)} cm2</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-600">Estimated Holes</span>
-                    <span className="font-medium text-slate-900">{measurements.holeCount}</span>
+                    <span className="font-medium text-slate-900">
+                      {measurements.surfaceArea !== null 
+                        ? `${(measurements.surfaceArea / 100).toFixed(2)} cm2`
+                        : 'Calculating...'}
+                    </span>
                   </div>
                   <div className="text-xs text-slate-500 pt-3 border-t border-slate-200">
-                    Note: Surface area and hole count are estimates based on mesh data.
+                    Note: Surface area is estimated based on mesh data.
                   </div>
                 </div>
               ) : (

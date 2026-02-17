@@ -32,7 +32,7 @@ export default function AutoCADViewCube({
       canvas.height = 256;
       const ctx = canvas.getContext("2d");
 
-      ctx.fillStyle = "#ffffff";
+      ctx.fillStyle = "#e5e7eb";
       ctx.fillRect(0, 0, 256, 256);
 
       ctx.fillStyle = "#111827";
@@ -77,7 +77,7 @@ export default function AutoCADViewCube({
       raycaster.setFromCamera(mouse, cubeCamera);
       const intersects = raycaster.intersectObject(cube);
 
-      cube.material.forEach(m => m.color.set("#ffffff"));
+      cube.material.forEach(m => m.color.set("#e5e7eb"));
 
       if (intersects.length > 0) {
         hoverIndex = intersects[0].face.materialIndex;
@@ -153,7 +153,7 @@ export default function AutoCADViewCube({
     // ===== SYNC ROTATION =====
     let rafId = 0;
     function animate() {
-      cube.quaternion.copy(camera.quaternion);
+      cube.quaternion.copy(camera.quaternion).invert();
       renderer.render(scene, cubeCamera);
       rafId = requestAnimationFrame(animate);
     }
