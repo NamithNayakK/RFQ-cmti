@@ -388,9 +388,8 @@ export default function CadViewerPage({ request, onBack }) {
         setLoadingStatus('');
         setError('');
 
-        // Defer heavy calculations to after initial render
         setTimeout(() => {
-          // Compute vertex colors for orientation-based coloring
+
           group.traverse((child) => {
             if (child.isMesh && child.geometry) {
               const geometry = child.geometry;
@@ -415,7 +414,6 @@ export default function CadViewerPage({ request, onBack }) {
             }
           });
           
-          // Apply vertex colors if color mode is enabled
           if (colorMode) {
             group.traverse((child) => {
               if (child.isMesh && child.material && child.userData.hasVertexColors) {
@@ -426,7 +424,6 @@ export default function CadViewerPage({ request, onBack }) {
           }
         }, 100);
 
-        // Defer volume and surface area calculation to prevent blocking
         setTimeout(() => {
           let totalSurfaceArea = 0;
           let totalVolume = 0;
@@ -450,14 +447,11 @@ export default function CadViewerPage({ request, onBack }) {
                   a.fromBufferAttribute(posAttr, indices[i]);
                   b.fromBufferAttribute(posAttr, indices[i + 1]);
                   c.fromBufferAttribute(posAttr, indices[i + 2]);
-                  
-                  // Surface area: 0.5 * |cross(b-a, c-a)|
+                
                   ab.subVectors(b, a);
                   ac.subVectors(c, a);
                   cross.crossVectors(ab, ac);
                   totalSurfaceArea += cross.length() * 0.5;
-                  
-                  // Signed tetrahedron volume: (1/6) * dot(a, cross(b,c))
                   cross.crossVectors(b, c);
                   totalVolume += a.dot(cross) / 6;
                 }
@@ -465,7 +459,6 @@ export default function CadViewerPage({ request, onBack }) {
             }
           });
           
-          // Volume is the absolute value (handles inconsistent triangle winding)
           totalVolume = Math.abs(totalVolume);
           
           setMeasurements(prev => ({
@@ -493,7 +486,6 @@ export default function CadViewerPage({ request, onBack }) {
         window.removeEventListener('resize', handleResize);
       }
       
-      // Dispose all scene objects
       if (sceneRef.current?.group) {
         sceneRef.current.group.traverse((child) => {
           if (child.geometry) {
@@ -642,7 +634,6 @@ export default function CadViewerPage({ request, onBack }) {
               opacity: 0,
               side: THREE.DoubleSide
             });
-            // Show ALL edges in a single color (classic wireframe)
             if (visibleEdges) {
               visibleEdges.visible = true;
               visibleEdges.material.color.setHex(0x000000);
@@ -663,7 +654,6 @@ export default function CadViewerPage({ request, onBack }) {
               opacity: 0,
               side: THREE.DoubleSide
             });
-            // Show visible edges bold, hidden edges faint/gray
             if (visibleEdges) {
               visibleEdges.visible = true;
               visibleEdges.material.color.setHex(0x000000);
@@ -685,7 +675,6 @@ export default function CadViewerPage({ request, onBack }) {
 
           case 'wireframe-visible-edges':
             child.visible = true;
-            // No fill, only visible edges (same as shaded-visible-edges but no color)
             child.material = new THREE.MeshBasicMaterial({
               color: 0x000000,
               transparent: true,

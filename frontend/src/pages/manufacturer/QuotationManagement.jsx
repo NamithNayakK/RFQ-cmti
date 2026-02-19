@@ -330,6 +330,29 @@ export default function QuotationManagement({ filterStatus: initialFilter = 'all
 
                   {/* Action Buttons */}
                   <div className="flex gap-2 pt-2">
+                    <button
+                      onClick={() => openCadViewer(request)}
+                      className="flex-1 border-2 border-slate-300 text-slate-700 font-semibold py-2.5 px-4 rounded-lg hover:bg-slate-50 transition flex items-center justify-center gap-2"
+                      title="View 3D CAD"
+                    >
+                      <FiEye size={18} />
+                      View 3D
+                    </button>
+                    <button
+                      onClick={() => handleDownloadFile(request)}
+                      className="flex-1 border-2 border-slate-300 text-slate-700 font-semibold py-2.5 px-4 rounded-lg hover:bg-slate-50 transition flex items-center justify-center gap-2"
+                      title="Download CAD file"
+                    >
+                      <FiDownload size={18} />
+                      Download
+                    </button>
+                    <button
+                      onClick={() => openQuoteModal(request, 'view')}
+                      className="flex-1 border-2 border-manufacturing-accent text-manufacturing-accent font-semibold py-2.5 px-4 rounded-lg hover:bg-manufacturing-accent/10 transition flex items-center justify-center gap-2"
+                    >
+                      <FiEye size={18} />
+                      View Details
+                    </button>
                     {!request.quote_status && (
                       <button
                         onClick={() => openQuoteModal(request, 'create')}
@@ -340,29 +363,6 @@ export default function QuotationManagement({ filterStatus: initialFilter = 'all
                         Create Quote
                       </button>
                     )}
-                    <button
-                      onClick={() => handleDownloadFile(request)}
-                      className="flex-1 border-2 border-slate-300 text-slate-700 font-semibold py-2.5 px-4 rounded-lg hover:bg-slate-50 transition flex items-center justify-center gap-2"
-                      title="Download CAD file"
-                    >
-                      <FiDownload size={18} />
-                      Download
-                    </button>
-                    <button
-                      onClick={() => openCadViewer(request)}
-                      className="flex-1 border-2 border-slate-300 text-slate-700 font-semibold py-2.5 px-4 rounded-lg hover:bg-slate-50 transition flex items-center justify-center gap-2"
-                      title="View 3D CAD"
-                    >
-                      <FiEye size={18} />
-                      View 3D
-                    </button>
-                    <button
-                      onClick={() => openQuoteModal(request, 'view')}
-                      className="flex-1 border-2 border-manufacturing-accent text-manufacturing-accent font-semibold py-2.5 px-4 rounded-lg hover:bg-manufacturing-accent/10 transition flex items-center justify-center gap-2"
-                    >
-                      <FiEye size={18} />
-                      View Details
-                    </button>
                   </div>
                 </div>
               </div>
