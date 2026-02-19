@@ -11,9 +11,8 @@ import NotificationCenter from './components/NotificationCenter';
 import { fileService } from './api/fileService';
 
 function ManufacturerApp({ onLogout }) {
-  const [activeNav, setActiveNav] = useState(() => {
-    return localStorage.getItem('manufacturerActivePage') || 'Dashboard';
-  });
+  // Always default to Dashboard on first load (ignore localStorage)
+  const [activeNav, setActiveNav] = useState('Dashboard');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     return localStorage.getItem('manufacturerSidebarCollapsed') === 'true';
   });

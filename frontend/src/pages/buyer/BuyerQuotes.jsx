@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import BuyerQuotePDF from './BuyerQuotePDF';
 import { FiCheck, FiX, FiTrendingUp, FiClock, FiBell, FiRefreshCw } from 'react-icons/fi';
 import { fileService } from '../../api/fileService';
 
@@ -332,7 +333,7 @@ export default function BuyerQuotes() {
       {/* Quote Details Modal */}
       {showDetails && selectedQuote && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-96 overflow-y-auto">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-slate-50 border-b px-6 py-4 flex justify-between items-center">
               <h2 className="text-xl font-bold text-slate-900">Quotation Details</h2>
               <button
@@ -342,70 +343,13 @@ export default function BuyerQuotes() {
                 ×
               </button>
             </div>
-
             <div className="p-6 space-y-4">
-              {/* Part Information */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-slate-600">Part Name</p>
-                  <p className="text-lg font-semibold text-slate-900">{selectedQuote.part_name}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-slate-600">Part Number</p>
-                  <p className="text-lg font-semibold text-slate-900">{selectedQuote.part_number || 'N/A'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-slate-600">Material</p>
-                  <p className="text-lg font-semibold text-slate-900">{selectedQuote.material}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-slate-600">Quantity</p>
-                  <p className="text-lg font-semibold text-slate-900">{selectedQuote.quantity_unit}</p>
-                </div>
-              </div>
-
-              {/* Cost Breakdown */}
-              <div className="bg-slate-50 rounded-lg p-4 space-y-2">
-                <p className="font-semibold text-slate-900 mb-3">Cost Breakdown</p>
-                <div className="flex justify-between">
-                  <span className="text-slate-600">Material Cost:</span>
-                  <span className="font-medium">₹{selectedQuote.material_cost?.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-600">Labor Cost:</span>
-                  <span className="font-medium">₹{selectedQuote.labor_cost?.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-600">Machine Time:</span>
-                  <span className="font-medium">₹{selectedQuote.machine_time_cost?.toFixed(2)}</span>
-                </div>
-                <div className="border-t pt-2 flex justify-between">
-                  <span className="text-slate-600">Subtotal:</span>
-                  <span className="font-medium">₹{selectedQuote.subtotal?.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-600">Profit Margin ({selectedQuote.profit_margin_percent}%):</span>
-                  <span className="font-medium text-blue-600">₹{selectedQuote.profit_amount?.toFixed(2)}</span>
-                </div>
-                <div className="border-t pt-2 flex justify-between">
-                  <span className="text-slate-900 font-semibold">Total Price:</span>
-                  <span className="text-lg font-bold text-green-600">₹{selectedQuote.total_price?.toFixed(2)}</span>
-                </div>
-              </div>
-
-              {/* Notes */}
-              {selectedQuote.notes && (
-                <div>
-                  <p className="text-sm text-slate-600">Notes</p>
-                  <p className="text-slate-900 bg-slate-50 rounded p-3">{selectedQuote.notes}</p>
-                </div>
-              )}
-
+              {/* PDF Quotation Template and Download Button */}
+              <BuyerQuotePDF quote={mapQuoteToPDF(selectedQuote)} />
               {/* Status Info */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <p className="text-sm text-slate-600">Current Status: {getStatusBadge(selectedQuote.status)}</p>
               </div>
-
               {/* Action Buttons */}
               {selectedQuote.status === 'sent' && (
                 <div className="space-y-4">
@@ -438,7 +382,37 @@ export default function BuyerQuotes() {
             </div>
           </div>
         </div>
+
       )}
     </div>
   );
+}
+
+// Helper to map selectedQuote to BuyerQuotePDF template fields
+function mapQuoteToPDF(quote) {
+  // Fallbacks for missing fields
+  return {
+    companyName: quote.manufacturer_name || 'Manufacturer',
+    companyAddress: quote.manufacturer_address || '',
+    companyEmail: quote.manufacturer_email || '',
+    companyContact: quote.manufacturer_contact || '',
+    companyWebsite: quote.manufacturer_website || '',
+    customerName: quote.buyer_name || '',
+    customerAddress: quote.buyer_address || '',
+    customerEmail: quote.buyer_email || '',
+    customerContact: quote.buyer_contact || '',
+    quoteNumber: quote.id || '',
+    validDates: quote.valid_until ? `Valid until ${new Date(quote.valid_until).toLocaleDateString()}` : '',
+    items: [
+      {
+        name: quote.part_name,
+        quantity: quote.quantity_unit,
+        price: quote.total_price || 0,
+      },
+    ],
+    subTotal: quote.subtotal || 0,
+    tax: quote.tax || 0,
+    discount: quote.discount || 0,
+    grandTotal: quote.total_price || 0,
+  };
 }

@@ -158,6 +158,11 @@ export default function CadViewerPage({ request, onBack }) {
           meshObj.userData.hasVertexColors = false; // Will be set to true after colors computed
           group.add(meshObj);
         });
+
+        // === FUSION 360 ORIENTATION FIX ===
+        // Fusion 360 uses Z-up, Y-front. Most Three.js scenes are Y-up, Z-front.
+        // To match Fusion, rotate the group -90 degrees around X axis.
+        group.rotation.x = -Math.PI / 2;
         
         setLoadingStatus('Building 3D scene...');
 
@@ -637,14 +642,17 @@ export default function CadViewerPage({ request, onBack }) {
               opacity: 0,
               side: THREE.DoubleSide
             });
+            // Show ALL edges in a single color (classic wireframe)
             if (visibleEdges) {
               visibleEdges.visible = true;
               visibleEdges.material.color.setHex(0x000000);
-              visibleEdges.material.linewidth = 2;
+              visibleEdges.material.linewidth = 1.5;
               visibleEdges.material.opacity = 1;
               visibleEdges.material.transparent = false;
             }
-            if (hiddenEdges) hiddenEdges.visible = false;
+            if (hiddenEdges) {
+              hiddenEdges.visible = false;
+            }
             break;
 
           case 'wireframe-hidden-edges':
@@ -655,6 +663,7 @@ export default function CadViewerPage({ request, onBack }) {
               opacity: 0,
               side: THREE.DoubleSide
             });
+            // Show visible edges bold, hidden edges faint/gray
             if (visibleEdges) {
               visibleEdges.visible = true;
               visibleEdges.material.color.setHex(0x000000);
@@ -666,8 +675,8 @@ export default function CadViewerPage({ request, onBack }) {
             if (hiddenEdges) {
               hiddenEdges.visible = true;
               hiddenEdges.material.color.setHex(0x999999);
-              hiddenEdges.material.linewidth = 1;
-              hiddenEdges.material.opacity = 0.35;
+              hiddenEdges.material.linewidth = 1.5;
+              hiddenEdges.material.opacity = 0.25;
               hiddenEdges.material.transparent = true;
               hiddenEdges.material.depthTest = false;
               hiddenEdges.renderOrder = -1;
@@ -676,6 +685,7 @@ export default function CadViewerPage({ request, onBack }) {
 
           case 'wireframe-visible-edges':
             child.visible = true;
+            // No fill, only visible edges (same as shaded-visible-edges but no color)
             child.material = new THREE.MeshBasicMaterial({
               color: 0x000000,
               transparent: true,
@@ -685,10 +695,9 @@ export default function CadViewerPage({ request, onBack }) {
             if (visibleEdges) {
               visibleEdges.visible = true;
               visibleEdges.material.color.setHex(0x1a1a1a);
-              visibleEdges.material.linewidth = 2.5;
+              visibleEdges.material.linewidth = 2;
               visibleEdges.material.opacity = 1;
               visibleEdges.material.transparent = false;
-              visibleEdges.material.depthTest = true;
             }
             if (hiddenEdges) hiddenEdges.visible = false;
             break;
