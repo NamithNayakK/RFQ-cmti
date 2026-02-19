@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { FiUpload, FiFolder, FiUsers } from 'react-icons/fi';
 import { fileService } from '../api/fileService';
+import QuoteOrderProgressBar from './QuoteOrderProgressBar';
 
 export default function Dashboard({ onBrowseAll }) {
   const [files, setFiles] = useState([]);
@@ -112,11 +113,21 @@ export default function Dashboard({ onBrowseAll }) {
         ) : (
           <div className="space-y-3">
             {stats.recentUploads.map((file) => (
-              <div key={file.id} className="flex items-center justify-between border border-slate-200 rounded-lg px-4 py-3">
-                <div>
-                  <p className="text-sm font-medium text-slate-900">{file.original_name}</p>
-                  <p className="text-xs text-slate-500">{new Date(file.created_at).toLocaleDateString()}</p>
+              <div key={file.id} className="flex flex-col gap-1 border border-slate-200 rounded-lg px-4 py-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-slate-900">{file.original_name}</p>
+                    <p className="text-xs text-slate-500">{new Date(file.created_at).toLocaleDateString()}</p>
+                  </div>
+                  {/* Show status if available */}
+                  {file.status && (
+                    <span className="ml-2 text-xs font-semibold px-2 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                      {file.status.charAt(0).toUpperCase() + file.status.slice(1)}
+                    </span>
+                  )}
                 </div>
+                {/* Progress bar for order tracking */}
+                <QuoteOrderProgressBar status={file.status} />
               </div>
             ))}
           </div>

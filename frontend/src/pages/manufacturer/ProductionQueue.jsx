@@ -88,9 +88,14 @@ export default function ProductionQueue({ refreshTrigger }) {
   };
 
   const updatePriority = (id, newPriority) => {
-    const updated = queue.map(item => (item.id === id ? { ...item, priority: newPriority } : item));
-    setQueue(updated);
-    persistQueueState(updated);
+    const item = queue.find(item => item.id === id);
+    if (!item || item.priority === newPriority) return;
+    const confirmMsg = `Are you sure you want to change priority from ${item.priority} to ${newPriority}?`;
+    if (window.confirm(confirmMsg)) {
+      const updated = queue.map(item => (item.id === id ? { ...item, priority: newPriority } : item));
+      setQueue(updated);
+      persistQueueState(updated);
+    }
   };
 
   const updateAssignment = (id, field, value) => {
