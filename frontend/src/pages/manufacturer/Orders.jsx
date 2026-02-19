@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import BuyerQuotePDF from '../buyer/BuyerQuotePDF';
 import { FiPackage, FiCalendar, FiCheckCircle, FiClock, FiEye } from 'react-icons/fi';
 import { fileService } from '../../api/fileService';
 
@@ -164,6 +165,9 @@ export default function Orders({ refreshTrigger, onRefresh }) {
 
             {/* Modal Content */}
             <div className="p-8 space-y-6">
+              {/* Quotation PDF Download for Manufacturer */}
+              <BuyerQuotePDF quote={mapOrderToPDF(selectedOrder)} />
+
               {/* Part Information */}
               <div className="bg-slate-50 rounded-lg p-6 space-y-4">
                 <h4 className="font-bold text-slate-900">Part Information</h4>
@@ -252,6 +256,34 @@ export default function Orders({ refreshTrigger, onRefresh }) {
           </div>
         </div>
       )}
-    </div>
+  </div>
   );
+}
+
+// Helper to map order to BuyerQuotePDF template fields
+function mapOrderToPDF(order) {
+  return {
+    companyName: order.manufacturer_name || 'Manufacturer',
+    companyAddress: order.manufacturer_address || '',
+    companyEmail: order.manufacturer_email || '',
+    companyContact: order.manufacturer_contact || '',
+    companyWebsite: order.manufacturer_website || '',
+    customerName: order.buyer_name || '',
+    customerAddress: order.buyer_address || '',
+    customerEmail: order.buyer_email || '',
+    customerContact: order.buyer_contact || '',
+    quoteNumber: order.id || '',
+    validDates: order.valid_until ? `Valid until ${new Date(order.valid_until).toLocaleDateString()}` : '',
+    items: [
+      {
+        name: order.part_name,
+        quantity: order.quantity_unit,
+        price: order.total_price || 0,
+      },
+    ],
+    subTotal: order.subtotal || 0,
+    tax: order.tax || 0,
+    discount: order.discount || 0,
+    grandTotal: order.total_price || 0,
+  };
 }
