@@ -83,24 +83,12 @@ export default function Dashboard({ onBrowseAll }) {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-3">
-        <button
-          onClick={onBrowseAll}
-          className="bg-white border border-slate-200 text-slate-700 font-semibold py-2.5 px-5 rounded-lg transition hover:bg-slate-50 hover:border-manufacturing-primary hover:text-manufacturing-primary"
-        >
-          Browse All Files
-        </button>
-      </div>
+
 
       <div className="bg-white rounded-2xl border border-slate-200 p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-slate-900">Recent Requests</h3>
-          <button
-            onClick={onBrowseAll}
-            className="text-sm text-slate-500 hover:text-slate-700"
-          >
-            View all →
-          </button>
+          {/* Removed 'View all' button for buyer dashboard */}
         </div>
 
         {loading ? (

@@ -30,8 +30,8 @@ export default function Login({ onLoginSuccess }) {
             <FiPackage size={20} />
           </div>
           <div>
-            <p className="text-lg font-semibold text-slate-900">CAD Vault</p>
-            <p className="text-xs text-slate-500">File Management</p>
+            <p className="text-lg font-semibold text-slate-900">Cost Management System</p>
+            <p className="text-xs text-slate-500">Cost Management</p>
           </div>
         </div>
 

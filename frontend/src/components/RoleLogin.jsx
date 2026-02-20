@@ -16,8 +16,8 @@ export default function RoleLogin({ onRoleSelect }) {
           <div className="h-16 w-16 rounded-xl bg-manufacturing-accent flex items-center justify-center text-white font-bold mx-auto mb-4">
             <FiPackage size={32} />
           </div>
-          <h1 className="text-4xl font-bold text-white mb-2">CAD Vault</h1>
-          <p className="text-white/70 text-lg">Manufacturing & File Management</p>
+          <h1 className="text-4xl font-bold text-white mb-2">Cost Management System</h1>
+          <p className="text-white/70 text-lg">Manufacturing & Cost Management</p>
         </div>
 
         {/* Role Selection */}
@@ -131,7 +131,7 @@ export default function RoleLogin({ onRoleSelect }) {
 
         {/* Footer */}
         <p className="text-center text-white/60 text-xs mt-8">
-          CAD Vault © 2026 • Manufacturing STP File Storage
+          Cost Management System © 2026 • Manufacturing STP File Storage
         </p>
       </div>
     </div>

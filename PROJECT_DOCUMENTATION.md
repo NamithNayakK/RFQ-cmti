@@ -25,7 +25,7 @@ This project is a full-stack web application for uploading, viewing, and managin
 - **Database:** PostgreSQL (via SQLAlchemy ORM)
 - **Storage:** Local or MinIO (S3-compatible object storage)
 - **CAD Processing:** OpenCascade (via WASM in frontend, backend for future extensions)
-- **API:** RESTful endpoints for authentication, file management, pricing, notifications, and quotes
+- **API:** RESTful endpoints for authentication, cost management, pricing, notifications, and quotes
 
 ### DevOps
 - **Version Control:** Git (GitHub)

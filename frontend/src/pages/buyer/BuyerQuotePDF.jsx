@@ -23,25 +23,24 @@ export default function BuyerQuotePDF({ quote }) {
     <div className="flex flex-col items-center">
       <div ref={pdfRef} className="bg-white p-8 rounded-lg shadow max-w-2xl w-full border border-slate-200">
         <div className="text-center mb-6">
-          <h2 className="text-2xl font-bold text-green-700 mb-1">SOFTWARE DEVELOPMENT PRICE QUOTE</h2>
-          <div className="text-xs text-slate-500">(Company/Project Header)</div>
+          <h2 className="text-2xl font-bold text-green-700 mb-1">PRICE QUOTE</h2>
         </div>
         <div className="mb-4">
           <div className="flex flex-wrap gap-8 text-sm">
             <div>
-              <div><b>Company Name:</b> {quote.companyName}</div>
-              <div><b>Address:</b> {quote.companyAddress}</div>
-              <div><b>Email:</b> {quote.companyEmail}</div>
-              <div><b>Contact Number:</b> {quote.companyContact}</div>
-              <div><b>Website:</b> {quote.companyWebsite}</div>
+              {quote.companyName && <div><b>Company Name:</b> {quote.companyName}</div>}
+              {quote.companyAddress && <div><b>Address:</b> {quote.companyAddress}</div>}
+              {quote.companyEmail && <div><b>Email:</b> {quote.companyEmail}</div>}
+              {quote.companyContact && <div><b>Contact Number:</b> {quote.companyContact}</div>}
+              {quote.companyWebsite && <div><b>Website:</b> {quote.companyWebsite}</div>}
             </div>
             <div>
-              <div><b>Customer Name:</b> {quote.customerName}</div>
-              <div><b>Address:</b> {quote.customerAddress}</div>
-              <div><b>Email:</b> {quote.customerEmail}</div>
-              <div><b>Contact Number:</b> {quote.customerContact}</div>
-              <div><b>Quote Number:</b> {quote.quoteNumber}</div>
-              <div><b>Valid Dates:</b> {quote.validDates}</div>
+              {quote.customerName && <div><b>Customer Name:</b> {quote.customerName}</div>}
+              {quote.customerAddress && <div><b>Address:</b> {quote.customerAddress}</div>}
+              {quote.customerEmail && <div><b>Email:</b> {quote.customerEmail}</div>}
+              {quote.customerContact && <div><b>Contact Number:</b> {quote.customerContact}</div>}
+              {quote.quoteNumber && <div><b>Quote Number:</b> {quote.quoteNumber}</div>}
+              {quote.validDates && <div><b>Valid Dates:</b> {quote.validDates}</div>}
             </div>
           </div>
         </div>
@@ -60,28 +59,36 @@ export default function BuyerQuotePDF({ quote }) {
                 <tr key={idx} className="border-b last:border-b-0">
                   <td className="py-1 px-2">{item.name}</td>
                   <td className="py-1 px-2 text-right">{item.quantity}</td>
-                  <td className="py-1 px-2 text-right">${item.price.toFixed(2)}</td>
-                  <td className="py-1 px-2 text-right">${(item.price * item.quantity).toFixed(2)}</td>
+                  <td className="py-1 px-2 text-right">${Number(item.price).toFixed(2)}</td>
+                  <td className="py-1 px-2 text-right">${(Number(item.price) * Number(item.quantity)).toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
-              <tr>
-                <td colSpan={3} className="text-right font-semibold">SUB TOTAL</td>
-                <td className="text-right">${quote.subTotal.toFixed(2)}</td>
-              </tr>
-              <tr>
-                <td colSpan={3} className="text-right font-semibold">TAX</td>
-                <td className="text-right">${quote.tax.toFixed(2)}</td>
-              </tr>
-              <tr>
-                <td colSpan={3} className="text-right font-semibold">DISCOUNT</td>
-                <td className="text-right">${quote.discount.toFixed(2)}</td>
-              </tr>
-              <tr className="bg-green-100">
-                <td colSpan={3} className="text-right font-bold">GRAND TOTAL</td>
-                <td className="text-right font-bold">${quote.grandTotal.toFixed(2)}</td>
-              </tr>
+              {typeof quote.subTotal === 'number' && (
+                <tr>
+                  <td colSpan={3} className="text-right font-semibold">SUB TOTAL</td>
+                  <td className="text-right">${Number(quote.subTotal).toFixed(2)}</td>
+                </tr>
+              )}
+              {typeof quote.tax === 'number' && (
+                <tr>
+                  <td colSpan={3} className="text-right font-semibold">TAX</td>
+                  <td className="text-right">${Number(quote.tax).toFixed(2)}</td>
+                </tr>
+              )}
+              {typeof quote.discount === 'number' && (
+                <tr>
+                  <td colSpan={3} className="text-right font-semibold">DISCOUNT</td>
+                  <td className="text-right">${Number(quote.discount).toFixed(2)}</td>
+                </tr>
+              )}
+              {typeof quote.grandTotal === 'number' && (
+                <tr className="bg-green-100">
+                  <td colSpan={3} className="text-right font-bold">GRAND TOTAL</td>
+                  <td className="text-right font-bold">${Number(quote.grandTotal).toFixed(2)}</td>
+                </tr>
+              )}
             </tfoot>
           </table>
         </div>

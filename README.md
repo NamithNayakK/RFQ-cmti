@@ -1,6 +1,6 @@
 # ADA - RFQ / CAD Management System
 
-A full-stack RFQ (Request for Quotation) and CAD file management system with buyer and manufacturer roles. Buyers upload CAD files and receive quotations. Manufacturers review requests, send quotes, and manage production queue.
+A full-stack RFQ (Request for Quotation) and CAD cost management system with buyer and manufacturer roles. Buyers upload CAD files and receive quotations. Manufacturers review requests, send quotes, and manage production queue.
 
 ## Features
 

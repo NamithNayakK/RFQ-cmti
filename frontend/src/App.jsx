@@ -32,8 +32,8 @@ function App({ onLogout }) {
               <FiPackage size={20} />
             </div>
             <div>
-              <p className="text-lg font-semibold">CAD Vault</p>
-              <p className="text-xs text-white/70">File Management</p>
+              <p className="text-lg font-semibold">Cost Management System</p>
+              <p className="text-xs text-white/70">Cost Management</p>
             </div>
           </div>
         </div>
