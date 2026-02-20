@@ -69,8 +69,7 @@ export default function FileUpload({ onUploadSuccess }) {
         throw new Error('STEP parser not available');
       }
 
-      const importParams = { linearUnit: 'millimeter' };
-      const result = isIges ? readIges(buffer, importParams) : readStep(buffer, importParams);
+      const result = isIges ? readIges(buffer) : readStep(buffer);
       const meshes = result?.meshes || [];
 
       if (!meshes.length) {
@@ -161,12 +160,13 @@ export default function FileUpload({ onUploadSuccess }) {
   };
 
   const handleFileChange = async (e) => {
-    const file = e.target.files[0];
-    if (file) {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+    // For now, only show thumbnail for the first file
+    const allowedExtensions = ['.stp', '.step', '.igs', '.iges', '.stl', '.dxf', '.dwg', '.x_t', '.x_b', '.sat', '.3dm', '.prt', '.sldprt', '.sldasm', '.fcstd'];
+    for (const file of files) {
       const fileName = file.name.toLowerCase();
-      const allowedExtensions = ['.stp', '.step', '.igs', '.iges', '.stl', '.dxf', '.dwg', '.x_t', '.x_b', '.sat', '.3dm', '.prt', '.sldprt', '.sldasm', '.fcstd'];
       const hasValidExtension = allowedExtensions.some(ext => fileName.endsWith(ext));
-      
       if (!hasValidExtension) {
         setError(`Only CAD files are allowed: ${allowedExtensions.join(', ')}`);
         return;
@@ -175,15 +175,16 @@ export default function FileUpload({ onUploadSuccess }) {
         setError('File size must not exceed 500 MB');
         return;
       }
-      setFormData(prev => ({
-        ...prev,
-        filename: file.name
-      }));
-      setError(null);
-      setThumbnailData(null);
-      setThumbnailError(null);
-      await generateThumbnail(file);
     }
+    // Set filename to first file for display
+    setFormData(prev => ({
+      ...prev,
+      filename: files[0].name
+    }));
+    setError(null);
+    setThumbnailData(null);
+    setThumbnailError(null);
+    await generateThumbnail(files[0]);
   };
 
   const handleSubmit = async (e) => {
@@ -300,6 +301,7 @@ export default function FileUpload({ onUploadSuccess }) {
               onChange={handleFileChange}
               disabled={loading}
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              multiple
             />
             <div className="pointer-events-none">
               <FiUpload className="mx-auto h-10 w-10 text-slate-400 mb-2" />

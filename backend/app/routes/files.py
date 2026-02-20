@@ -28,12 +28,11 @@ def request_upload_url(
             filename=data.filename,
             content_type=data.content_type,
             db=db,
-            uploaded_by=current_user['username'],
+            created_by=current_user['username'],
             description=data.description,
             material=data.material,
             part_number=data.part_number,
             quantity_unit=data.quantity_unit,
-            thumbnail_data=data.thumbnail_data,
         )
         return {"upload_url": upload_url, "download_url": download_url, "file_id": file_id}
     except Exception as e:
