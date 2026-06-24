@@ -31,7 +31,9 @@ export default function ProductionQueue({ refreshTrigger }) {
       let savedState = {};
       try {
         savedState = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-      } catch (_) {}
+      } catch (_) {
+        // ignore storage parse errors
+      }
 
       const queueItems = acceptedQuotes.map((quote) => {
         const saved = savedState[quote.id] || {};
@@ -78,7 +80,9 @@ export default function ProductionQueue({ refreshTrigger }) {
     });
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch (_) {}
+    } catch (_) {
+      // ignore storage write errors
+    }
   };
 
   const updateStatus = (id, newStatus) => {
@@ -160,10 +164,11 @@ export default function ProductionQueue({ refreshTrigger }) {
         case 'dueDate':
           comparison = new Date(a.dueDate) - new Date(b.dueDate);
           break;
-        case 'priority':
+        case 'priority': {
           const priorityOrder = { High: 3, Medium: 2, Low: 1 };
           comparison = priorityOrder[b.priority] - priorityOrder[a.priority];
           break;
+        }
         case 'progress':
           comparison = a.progress - b.progress;
           break;

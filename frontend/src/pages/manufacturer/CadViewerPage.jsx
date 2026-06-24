@@ -12,7 +12,6 @@ export default function CadViewerPage({ request, onBack }) {
   const [displayMode, setDisplayMode] = useState('shaded-visible-edges');
   const [colorMode, setColorMode] = useState(true); // true = colored by orientation, false = single color
   const sceneRef = useRef(null);
-  const [activeView, setActiveView] = useState('iso');
   const animationRef = useRef({ isAnimating: false, startTime: 0, duration: 500 });
 
   useEffect(() => {
@@ -159,45 +158,44 @@ export default function CadViewerPage({ request, onBack }) {
           group.add(meshObj);
         });
 
+        // 1. Calculate bounding box of unrotated group to get accurate local physical dimensions
+        const bboxUnrotated = new THREE.Box3().setFromObject(group);
+        const centerUnrotated = new THREE.Vector3();
+        bboxUnrotated.getCenter(centerUnrotated);
+        const sizeUnrotated = new THREE.Vector3();
+        bboxUnrotated.getSize(sizeUnrotated);
+
+        // Center the group relative to the unrotated center
+        group.position.sub(centerUnrotated);
+
         // === FUSION 360 ORIENTATION FIX ===
         // Fusion 360 uses Z-up, Y-front. Most Three.js scenes are Y-up, Z-front.
-        // To match Fusion, rotate the group -90 degrees around X axis.
+        // To match Fusion, rotate the group -90 degrees around X axis after centering.
         group.rotation.x = -Math.PI / 2;
         
         setLoadingStatus('Building 3D scene...');
 
         scene.add(group);
 
-        const bbox = new THREE.Box3().setFromObject(group);
-        const center = new THREE.Vector3();
-        bbox.getCenter(center);
-
-        const size = new THREE.Vector3();
-        bbox.getSize(size);
-
-        const normalizedCenter = center.clone();
-        group.position.sub(center);
-        
-        // Recalculate bbox after repositioning
+        // Ensure matrices are updated
         group.updateMatrixWorld(true);
-        const bboxAfter = new THREE.Box3().setFromObject(group);
-        const sizeAfter = new THREE.Vector3();
-        bboxAfter.getSize(sizeAfter);
+
+        const maxDim = Math.max(sizeUnrotated.x, sizeUnrotated.y, sizeUnrotated.z);
+        const normalizedCenter = new THREE.Vector3(0, 0, 0);
 
         // Set basic measurements immediately (volume/surface area calculated in deferred block)
         setMeasurements({
           dimensions: {
-            length: sizeAfter.x,
-            width: sizeAfter.y,
-            height: sizeAfter.z,
-            maxDimension: Math.max(sizeAfter.x, sizeAfter.y, sizeAfter.z)
+            length: sizeUnrotated.x,
+            width: sizeUnrotated.y,
+            height: sizeUnrotated.z,
+            maxDimension: maxDim
           },
           volume: null, // Will be computed from mesh (more accurate than bounding box)
           surfaceArea: null, // Will be calculated after render
           unit: 'mm' // Measurements are in millimeters
         });
 
-        const maxDim = Math.max(sizeAfter.x, sizeAfter.y, sizeAfter.z);
         const cameraOffset = maxDim * 2.5;
 
         const camera = new THREE.PerspectiveCamera(
@@ -207,9 +205,9 @@ export default function CadViewerPage({ request, onBack }) {
           maxDim * 1000
         );
         camera.position.set(
-          normalizedCenter.x + cameraOffset,
-          normalizedCenter.y + cameraOffset * 0.6,
-          normalizedCenter.z + cameraOffset
+          cameraOffset,
+          cameraOffset * 0.6,
+          cameraOffset
         );
         camera.lookAt(normalizedCenter);
 
@@ -439,21 +437,37 @@ export default function CadViewerPage({ request, onBack }) {
             if (child.isMesh && child.geometry) {
               const geometry = child.geometry;
               
-              if (geometry.index && geometry.getAttribute('position')) {
-                const posAttr = geometry.getAttribute('position');
-                const indices = geometry.index.array;
-                
-                for (let i = 0; i < indices.length; i += 3) {
-                  a.fromBufferAttribute(posAttr, indices[i]);
-                  b.fromBufferAttribute(posAttr, indices[i + 1]);
-                  c.fromBufferAttribute(posAttr, indices[i + 2]);
-                
-                  ab.subVectors(b, a);
-                  ac.subVectors(c, a);
-                  cross.crossVectors(ab, ac);
-                  totalSurfaceArea += cross.length() * 0.5;
-                  cross.crossVectors(b, c);
-                  totalVolume += a.dot(cross) / 6;
+              const posAttr = geometry.getAttribute('position');
+              
+              if (posAttr) {
+                if (geometry.index) {
+                  const indices = geometry.index.array;
+                  for (let i = 0; i < indices.length; i += 3) {
+                    a.fromBufferAttribute(posAttr, indices[i]);
+                    b.fromBufferAttribute(posAttr, indices[i + 1]);
+                    c.fromBufferAttribute(posAttr, indices[i + 2]);
+                  
+                    ab.subVectors(b, a);
+                    ac.subVectors(c, a);
+                    cross.crossVectors(ab, ac);
+                    totalSurfaceArea += cross.length() * 0.5;
+                    cross.crossVectors(b, c);
+                    totalVolume += a.dot(cross) / 6;
+                  }
+                } else {
+                  const count = posAttr.count;
+                  for (let i = 0; i < count; i += 3) {
+                    a.fromBufferAttribute(posAttr, i);
+                    b.fromBufferAttribute(posAttr, i + 1);
+                    c.fromBufferAttribute(posAttr, i + 2);
+                  
+                    ab.subVectors(b, a);
+                    ac.subVectors(c, a);
+                    cross.crossVectors(ab, ac);
+                    totalSurfaceArea += cross.length() * 0.5;
+                    cross.crossVectors(b, c);
+                    totalVolume += a.dot(cross) / 6;
+                  }
                 }
               }
             }
@@ -517,7 +531,7 @@ export default function CadViewerPage({ request, onBack }) {
   const setView = (viewName) => {
     if (!sceneRef.current?.camera || !sceneRef.current?.controls) return;
 
-    const { camera, controls, normalizedCenter, cameraOffset, THREE } = sceneRef.current;
+    const { camera, normalizedCenter, cameraOffset, THREE } = sceneRef.current;
     const offset = cameraOffset;
 
     let targetPosition = new THREE.Vector3();
@@ -579,7 +593,6 @@ export default function CadViewerPage({ request, onBack }) {
       targetCenter: normalizedCenter.clone()
     };
 
-    setActiveView(viewName);
   };
 
   const applyDisplayMode = (group, mode, THREE, useVertexColors) => {

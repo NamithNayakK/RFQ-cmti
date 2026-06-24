@@ -57,9 +57,7 @@ const ViewCube = ({ camera, controls, size = 100 }) => {
     const cube = new THREE.Mesh(geometry, materials);
     scene.add(cube);
 
-    // Create text labels for each face
-    const loader = new THREE.FontLoader();
-    
+
     // Create text sprites for each face
     const createTextSprite = (text, color = 0x0000FF) => {
       const canvas = document.createElement('canvas');

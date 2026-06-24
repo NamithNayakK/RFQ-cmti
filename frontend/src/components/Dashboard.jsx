@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FiUpload, FiFolder, FiUsers } from 'react-icons/fi';
+import { FiUpload, FiFolder } from 'react-icons/fi';
 import { fileService } from '../api/fileService';
 import QuoteOrderProgressBar from './QuoteOrderProgressBar';
 
-export default function Dashboard({ onBrowseAll }) {
+export default function Dashboard() {
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -31,14 +31,6 @@ export default function Dashboard({ onBrowseAll }) {
 
     return { totalFiles, totalCADFiles, requestsSent, recentUploads };
   }, [files]);
-
-  const formatBytes = (bytes) => {
-    if (!bytes) return '0 Bytes';
-    if (bytes < 1024) return `${bytes} Bytes`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-    return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
-  };
 
   return (
     <div className="space-y-6">

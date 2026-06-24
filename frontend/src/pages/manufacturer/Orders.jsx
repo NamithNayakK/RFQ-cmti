@@ -3,14 +3,14 @@ import BuyerQuotePDF from '../buyer/BuyerQuotePDF';
 import { FiPackage, FiCalendar, FiCheckCircle, FiClock, FiEye } from 'react-icons/fi';
 import { fileService } from '../../api/fileService';
 
-export default function Orders({ refreshTrigger, onRefresh }) {
+export default function Orders({ refreshTrigger }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null); 
   const [showDetails, setShowDetails] = useState(false); 
   const [showFileSelect, setShowFileSelect] = useState(false);
-  const [selectedFile, setSelectedFile] = useState(null);
+
 
   useEffect(() => {
     loadAcceptedOrders();
@@ -36,10 +36,8 @@ export default function Orders({ refreshTrigger, onRefresh }) {
       setSelectedOrder(order);
       setShowFileSelect(true);
       setShowDetails(false);
-      setSelectedFile(null);
     } else {
       setSelectedOrder(order);
-      setSelectedFile(order.files && order.files.length === 1 ? order.files[0] : null);
       setShowDetails(true);
       setShowFileSelect(false);
     }
@@ -156,7 +154,7 @@ export default function Orders({ refreshTrigger, onRefresh }) {
         <div className="text-center py-16 bg-white rounded-xl border border-slate-200">
           <FiPackage size={40} className="text-slate-300 mx-auto mb-3" />
           <p className="text-slate-700 font-medium">No accepted orders yet</p>
-          <p className="text-slate-500 text-sm">When buyers accept your quotes, they'll appear here</p>
+          <p className="text-slate-500 text-sm">When buyers accept your quotes, they&apos;ll appear here</p>
         </div>
       )}
 
@@ -193,32 +191,6 @@ export default function Orders({ refreshTrigger, onRefresh }) {
                     <p className="font-semibold text-slate-900">{selectedOrder.part_number || 'N/A'}</p>
                   </div>
                   <div>
-      {/* File Selection Modal */}
-      {showFileSelect && selectedOrder && (
-        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
-            <div className="px-6 py-4 border-b bg-manufacturing-accent text-white rounded-t-xl flex items-center justify-between">
-              <h3 className="text-lg font-bold">Select a file to view</h3>
-              <button onClick={() => setShowFileSelect(false)} className="text-white text-2xl">×</button>
-            </div>
-            <div className="p-6 space-y-4">
-              {selectedOrder.files.map((file, idx) => (
-                <button
-                  key={file.id || idx}
-                  onClick={() => {
-                    setSelectedFile(file);
-                    setShowDetails(true);
-                    setShowFileSelect(false);
-                  }}
-                  className="w-full bg-slate-100 hover:bg-manufacturing-accent hover:text-white rounded-lg px-4 py-3 text-left font-medium transition"
-                >
-                  {file.original_name || `File ${idx + 1}`}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
                     <p className="text-sm text-slate-600">Material</p>
                     <p className="font-semibold text-slate-900">{selectedOrder.material || 'N/A'}</p>
                   </div>
@@ -290,6 +262,32 @@ export default function Orders({ refreshTrigger, onRefresh }) {
                   <p className="text-slate-600 whitespace-pre-wrap">{selectedOrder.notes}</p>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* File Selection Modal */}
+      {showFileSelect && selectedOrder && (
+        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+            <div className="px-6 py-4 border-b bg-manufacturing-accent text-white rounded-t-xl flex items-center justify-between">
+              <h3 className="text-lg font-bold">Select a file to view</h3>
+              <button onClick={() => setShowFileSelect(false)} className="text-white text-2xl">×</button>
+            </div>
+            <div className="p-6 space-y-4">
+              {selectedOrder.files.map((file, idx) => (
+                <button
+                  key={file.id || idx}
+                  onClick={() => {
+                    setShowDetails(true);
+                    setShowFileSelect(false);
+                  }}
+                  className="w-full bg-slate-100 hover:bg-manufacturing-accent hover:text-white rounded-lg px-4 py-3 text-left font-medium transition"
+                >
+                  {file.original_name || `File ${idx + 1}`}
+                </button>
+              ))}
             </div>
           </div>
         </div>

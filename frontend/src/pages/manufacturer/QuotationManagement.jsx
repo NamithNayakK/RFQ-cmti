@@ -185,7 +185,7 @@ export default function QuotationManagement({ filterStatus: initialFilter = 'all
       };
 
       // Send quote to backend
-      const response = await fileService.createQuote(quotePayload);
+      await fileService.createQuote(quotePayload);
       
       // Mark notification as read
       await fileService.markNotificationAsRead(selectedRequest.id);

@@ -5,6 +5,7 @@ export default function RoleLogin({ onRoleSelect }) {
   const [selectedRole, setSelectedRole] = useState(null);
 
   const handleRoleSelect = (role) => {
+    setSelectedRole(role);
     onRoleSelect(role);
   };
 

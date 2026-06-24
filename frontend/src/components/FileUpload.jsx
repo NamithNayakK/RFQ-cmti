@@ -233,7 +233,7 @@ export default function FileUpload({ onUploadSuccess }) {
         throw new Error('Failed to get upload URL from server');
       }
       
-      const { upload_url, file_id } = urlResponse;
+      const { upload_url } = urlResponse;
 
       // Step 2: Upload file to presigned URL
       if (!upload_url) {
@@ -303,12 +303,23 @@ export default function FileUpload({ onUploadSuccess }) {
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               multiple
             />
-            <div className="pointer-events-none">
-              <FiUpload className="mx-auto h-10 w-10 text-slate-400 mb-2" />
+            <div className="pointer-events-none flex flex-col items-center justify-center">
+              {thumbnailGenerating ? (
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-manufacturing-primary mb-2 mx-auto"></div>
+              ) : thumbnailData ? (
+                <img src={thumbnailData} alt="CAD Preview" className="h-20 w-20 object-contain mb-2 bg-white rounded border border-slate-200 shadow-sm" />
+              ) : (
+                <FiUpload className="mx-auto h-10 w-10 text-slate-400 mb-2" />
+              )}
               <p className="text-slate-700 font-medium">
                 {formData.filename || 'Drop your file here'}
               </p>
-              <p className="text-sm text-slate-500 mt-1">or click to browse</p>
+              <p className="text-sm text-slate-500 mt-1">
+                {thumbnailGenerating ? 'Generating preview...' : 'or click to browse'}
+              </p>
+              {thumbnailError && (
+                <p className="text-xs text-slate-400 mt-1">{thumbnailError}</p>
+              )}
             </div>
           </div>
         </div>

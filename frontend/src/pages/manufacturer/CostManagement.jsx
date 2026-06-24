@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { FiPlus, FiX, FiEdit2, FiTrash2, FiSave, FiDollarSign, FiTrendingUp, FiZap } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiTrash2, FiZap } from 'react-icons/fi';
 import { fileService } from '../../api/fileService';
 
 export default function CostManagement() {

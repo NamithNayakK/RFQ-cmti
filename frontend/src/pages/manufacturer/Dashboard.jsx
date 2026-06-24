@@ -1,8 +1,8 @@
 import { useEffect, useState, useMemo } from 'react';
-import { FiTrendingUp, FiClock, FiShoppingCart, FiAlertCircle, FiFileText, FiCheckCircle } from 'react-icons/fi';
+import { FiShoppingCart, FiAlertCircle, FiFileText } from 'react-icons/fi';
 import { fileService } from '../../api/fileService';
 
-export default function ManufacturerDashboard({ onRefresh, onNavigate }) {
+export default function ManufacturerDashboard({ onNavigate }) {
   const [production, setProduction] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);

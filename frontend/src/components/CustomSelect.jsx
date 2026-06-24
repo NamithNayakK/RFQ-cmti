@@ -7,7 +7,6 @@ export default function CustomSelect({
   value, 
   onChange, 
   disabled = false, 
-  required = false,
   placeholder = 'Select an option...',
   options = [] 
 }) {

@@ -11,7 +11,6 @@ export default function BuyerQuotePDF({ quote }) {
     const imgData = canvas.toDataURL('image/png');
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
     const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
     const imgProps = pdf.getImageProperties(imgData);
     const pdfWidth = pageWidth;
     const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
@@ -59,8 +58,8 @@ export default function BuyerQuotePDF({ quote }) {
                 <tr key={idx} className="border-b last:border-b-0">
                   <td className="py-1 px-2">{item.name}</td>
                   <td className="py-1 px-2 text-right">{item.quantity}</td>
-                  <td className="py-1 px-2 text-right">${Number(item.price).toFixed(2)}</td>
-                  <td className="py-1 px-2 text-right">${(Number(item.price) * Number(item.quantity)).toFixed(2)}</td>
+                  <td className="py-1 px-2 text-right">₹{Number(item.price).toFixed(2)}</td>
+                  <td className="py-1 px-2 text-right">₹{(Number(item.price) * Number(item.quantity)).toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>
@@ -68,25 +67,25 @@ export default function BuyerQuotePDF({ quote }) {
               {typeof quote.subTotal === 'number' && (
                 <tr>
                   <td colSpan={3} className="text-right font-semibold">SUB TOTAL</td>
-                  <td className="text-right">${Number(quote.subTotal).toFixed(2)}</td>
+                  <td className="text-right">₹{Number(quote.subTotal).toFixed(2)}</td>
                 </tr>
               )}
               {typeof quote.tax === 'number' && (
                 <tr>
                   <td colSpan={3} className="text-right font-semibold">TAX</td>
-                  <td className="text-right">${Number(quote.tax).toFixed(2)}</td>
+                  <td className="text-right">₹{Number(quote.tax).toFixed(2)}</td>
                 </tr>
               )}
               {typeof quote.discount === 'number' && (
                 <tr>
                   <td colSpan={3} className="text-right font-semibold">DISCOUNT</td>
-                  <td className="text-right">${Number(quote.discount).toFixed(2)}</td>
+                  <td className="text-right">₹{Number(quote.discount).toFixed(2)}</td>
                 </tr>
               )}
               {typeof quote.grandTotal === 'number' && (
                 <tr className="bg-green-100">
                   <td colSpan={3} className="text-right font-bold">GRAND TOTAL</td>
-                  <td className="text-right font-bold">${Number(quote.grandTotal).toFixed(2)}</td>
+                  <td className="text-right font-bold">₹{Number(quote.grandTotal).toFixed(2)}</td>
                 </tr>
               )}
             </tfoot>

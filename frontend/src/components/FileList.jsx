@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FiDownload, FiTrash2, FiSearch, FiRefreshCw, FiFilter, FiEye, FiUpload } from 'react-icons/fi';
+import { FiDownload, FiTrash2, FiSearch, FiRefreshCw, FiFilter, FiEye } from 'react-icons/fi';
 import { fileService } from '../api/fileService';
 
 export default function FileList({ refreshTrigger }) {

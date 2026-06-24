@@ -7,7 +7,6 @@ export default function BuyerQuotes() {
   const [quotes, setQuotes] = useState([]);
   const [allQuotes, setAllQuotes] = useState([]);
   const [notifications, setNotifications] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [filterStatus, setFilterStatus] = useState('all');
   const [selectedQuote, setSelectedQuote] = useState(null);
@@ -286,7 +285,7 @@ export default function BuyerQuotes() {
 
         {/* Quotes List */}
         <div className="bg-white rounded-lg shadow overflow-hidden">
-          {loading ? (
+          {refreshing ? (
             <div className="p-8 text-center text-slate-600">Loading quotes...</div>
           ) : quotes.length === 0 ? (
             <div className="p-8 text-center text-slate-600">No quotes found</div>

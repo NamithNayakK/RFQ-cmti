@@ -20,8 +20,6 @@ export default function CadViewerModal({ isOpen, onClose, request }) {
     let renderer = null;
     let animationId = null;
     let handleResize = null;
-    let axesScene = null;
-    let axesCamera = null;
 
     const loadViewer = async () => {
       setLoading(true);
@@ -135,12 +133,11 @@ export default function CadViewerModal({ isOpen, onClose, request }) {
           group.add(meshObject);
         });
 
-        scene.add(group);
-
-        const box = new THREE.Box3().setFromObject(group);
-        const size = box.getSize(new THREE.Vector3());
-        const center = box.getCenter(new THREE.Vector3());
-        const maxDim = Math.max(size.x, size.y, size.z) || 1;
+        // 1. Calculate bounding box of unrotated group to get accurate local physical dimensions
+        const boxUnrotated = new THREE.Box3().setFromObject(group);
+        const sizeUnrotated = boxUnrotated.getSize(new THREE.Vector3());
+        const centerUnrotated = boxUnrotated.getCenter(new THREE.Vector3());
+        const maxDim = Math.max(sizeUnrotated.x, sizeUnrotated.y, sizeUnrotated.z) || 1;
 
         // Calculate surface area and actual mesh volume from mesh faces
         let totalSurfaceArea = 0;
@@ -156,19 +153,35 @@ export default function CadViewerModal({ isOpen, onClose, request }) {
           if (child.isMesh && child.geometry) {
             const geo = child.geometry;
             const positions = geo.getAttribute('position');
-            if (positions && geo.index) {
-              const indices = geo.index.array;
-              for (let i = 0; i < indices.length; i += 3) {
-                v1.fromBufferAttribute(positions, indices[i]);
-                v2.fromBufferAttribute(positions, indices[i + 1]);
-                v3.fromBufferAttribute(positions, indices[i + 2]);
-                edge1.subVectors(v2, v1);
-                edge2.subVectors(v3, v1);
-                cross.crossVectors(edge1, edge2);
-                totalSurfaceArea += cross.length() * 0.5;
-                // Signed tetrahedron volume: (1/6) * dot(v1, cross(v2, v3))
-                cross.crossVectors(v2, v3);
-                totalVolume += v1.dot(cross) / 6;
+            if (positions) {
+              if (geo.index) {
+                const indices = geo.index.array;
+                for (let i = 0; i < indices.length; i += 3) {
+                  v1.fromBufferAttribute(positions, indices[i]);
+                  v2.fromBufferAttribute(positions, indices[i + 1]);
+                  v3.fromBufferAttribute(positions, indices[i + 2]);
+                  edge1.subVectors(v2, v1);
+                  edge2.subVectors(v3, v1);
+                  cross.crossVectors(edge1, edge2);
+                  totalSurfaceArea += cross.length() * 0.5;
+                  // Signed tetrahedron volume: (1/6) * dot(v1, cross(v2, v3))
+                  cross.crossVectors(v2, v3);
+                  totalVolume += v1.dot(cross) / 6;
+                }
+              } else {
+                const count = positions.count;
+                for (let i = 0; i < count; i += 3) {
+                  v1.fromBufferAttribute(positions, i);
+                  v2.fromBufferAttribute(positions, i + 1);
+                  v3.fromBufferAttribute(positions, i + 2);
+                  edge1.subVectors(v2, v1);
+                  edge2.subVectors(v3, v1);
+                  cross.crossVectors(edge1, edge2);
+                  totalSurfaceArea += cross.length() * 0.5;
+                  // Signed tetrahedron volume: (1/6) * dot(v1, cross(v2, v3))
+                  cross.crossVectors(v2, v3);
+                  totalVolume += v1.dot(cross) / 6;
+                }
               }
             }
           }
@@ -191,17 +204,32 @@ export default function CadViewerModal({ isOpen, onClose, request }) {
           }
         });
 
+        // Center the model at origin (FitAll behavior)
+        group.position.sub(centerUnrotated);
+
+        // === FUSION 360 ORIENTATION FIX ===
+        // Fusion 360 uses Z-up, Y-front. Most Three.js scenes are Y-up, Z-front.
+        // To match Fusion, rotate the group -90 degrees around X axis after centering.
+        group.rotation.x = -Math.PI / 2;
+
+        scene.add(group);
+
+        // Ensure matrices are updated
+        group.updateMatrixWorld(true);
+
+        const normalizedCenter = new THREE.Vector3(0, 0, 0);
+
         // Extract measurements: dimensions from bounding box, volume/surface from mesh
         const extractedMeasurements = {
           boundingBox: {
-            min: { x: box.min.x, y: box.min.y, z: box.min.z },
-            max: { x: box.max.x, y: box.max.y, z: box.max.z },
-            center: { x: center.x, y: center.y, z: center.z }
+            min: { x: boxUnrotated.min.x, y: boxUnrotated.min.y, z: boxUnrotated.min.z },
+            max: { x: boxUnrotated.max.x, y: boxUnrotated.max.y, z: boxUnrotated.max.z },
+            center: { x: centerUnrotated.x, y: centerUnrotated.y, z: centerUnrotated.z }
           },
           dimensions: {
-            length: size.x,
-            width: size.y,
-            height: size.z,
+            length: sizeUnrotated.x,
+            width: sizeUnrotated.y,
+            height: sizeUnrotated.z,
             maxDimension: maxDim
           },
           volume: totalVolume,
@@ -209,12 +237,6 @@ export default function CadViewerModal({ isOpen, onClose, request }) {
           holeCount: Math.max(0, estimatedHolesCount)
         };
         setMeasurements(extractedMeasurements);
-
-        // Center the model at origin (FitAll behavior)
-        group.position.sub(center);
-
-        const normalizedBox = new THREE.Box3().setFromObject(group);
-        const normalizedCenter = normalizedBox.getCenter(new THREE.Vector3());
 
         // Enhanced lighting for better clarity
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
@@ -233,12 +255,13 @@ export default function CadViewerModal({ isOpen, onClose, request }) {
         
         scene.add(ambientLight, directionalLight, fillLight, backLight);
 
+        const rotatedBox = new THREE.Box3().setFromObject(group);
         const shadowPlane = new THREE.Mesh(
           new THREE.PlaneGeometry(maxDim * 5, maxDim * 5),
           new THREE.ShadowMaterial({ opacity: 0.15 })
         );
         shadowPlane.rotation.x = -Math.PI / 2;
-        shadowPlane.position.y = normalizedBox.min.y - 0.1;
+        shadowPlane.position.y = rotatedBox.min.y - 0.1;
         shadowPlane.receiveShadow = true;
         scene.add(shadowPlane);
 
